@@ -34,10 +34,10 @@ let expanded: {
 } | null = null;
 
 const ACTIONS: { action: ThreadAction | "open"; icon: string; label: string }[] = [
-  { action: "open", icon: "i-open", label: "Open in Gmail" },
   { action: "read", icon: "i-read", label: "Mark as read" },
   { action: "archive", icon: "i-archive", label: "Archive" },
   { action: "spam", icon: "i-spam", label: "Report spam" },
+  { action: "open", icon: "i-open", label: "Open in Gmail" },
 ];
 
 // ---------------------------------------------------------------------------
