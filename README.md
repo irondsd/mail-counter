@@ -2,6 +2,9 @@
 
 A Chrome extension that shows the unread count of several Gmail accounts in one toolbar badge.
 
+**Homepage:** <https://irondsd.github.io/mail-counter/> ·
+**Privacy policy:** <https://irondsd.github.io/mail-counter/privacy.html>
+
 It uses the official Gmail API with read-only label access (`gmail.labels`). It never touches
 cookies and never signs you in or out of Google. If it can't get a token silently, it marks the
 account "signed out" and waits for you to click **Reconnect**.
@@ -74,10 +77,8 @@ redirect URI in Google Cloud.
    only be added while the app is in Testing.)
    - Google may expire a Testing grant after about 7 days. If that happens, the account shows
      **signed out** and you click **Reconnect** once. You don't get logged out of Google.
-   - **Optional, to avoid that:** publish to **In production**. That needs a homepage and a
-     privacy-policy page on a domain you've verified. A free `<you>.github.io` GitHub Pages site,
-     verified in Google Search Console, usually works. You still don't need Google's app
-     verification for personal use; you'll see an "unverified app" screen once per account.
+   - To avoid that, publish the app. See
+     [Publishing the OAuth app](#publishing-the-oauth-app-optional) below.
 
 6. **Create the OAuth client.** Go to **Clients → Create client**:
    - Application type: **Web application**. Not "Chrome Extension", which only supports the
@@ -118,6 +119,38 @@ Access tokens last about an hour. Before one expires, the extension silently ask
 one (`prompt=none` with your email as `login_hint`). That reuses your normal Google session in
 Chrome, so nothing pops up. You'll only see **Reconnect** if you actually sign out of that Google
 account in Chrome, or revoke the app at <https://myaccount.google.com/connections>.
+
+## Publishing the OAuth app (optional)
+
+Publishing moves the app from **Testing** to **In production**, so Google stops expiring the grant
+after a week. Google then wants a homepage and a privacy policy on a domain you've proven you own.
+The `docs/` folder holds both pages, served by GitHub Pages.
+
+1. **Turn on GitHub Pages.** In the repo, go to **Settings → Pages**, set Source to **Deploy from
+   a branch**, branch **main**, folder **/docs**, and save. After a minute the site is at
+   <https://irondsd.github.io/mail-counter/>.
+
+2. **Prove you own `irondsd.github.io`.** Google checks the domain root, and a project site lives
+   under `/mail-counter/`, so this needs your user site:
+   - In [Google Search Console](https://search.google.com/search-console), sign in with the same
+     Google account that owns the Cloud project. Add a property, choose **URL prefix**, and enter
+     `https://irondsd.github.io/`. Pick the **HTML file** method and download the
+     `google….html` file.
+   - Create a public repo named exactly `irondsd.github.io`. Commit that file to its root,
+     optionally with an `index.html` that links to `/mail-counter/`. GitHub publishes user sites
+     automatically.
+   - Back in Search Console, click **Verify**.
+
+3. **Fill in the branding.** In Google Auth Platform, go to **Branding**:
+   - Application home page: `https://irondsd.github.io/mail-counter/`
+   - Privacy policy link: `https://irondsd.github.io/mail-counter/privacy.html`
+   - Authorized domains: `irondsd.github.io`
+
+   Save.
+
+4. **Publish.** Go to **Audience → Publish app** and confirm. The status should read **In
+   production**. You don't need Google's verification review for personal use (under 100 users).
+   You'll see "Google hasn't verified this app" once per account when you connect it.
 
 ## Tweaks
 

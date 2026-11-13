@@ -35,3 +35,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # extension private signing key (the public key in extension-key.json is safe to commit)
 .keys
+
+# local editor/agent config
+.claude/
