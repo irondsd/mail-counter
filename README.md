@@ -69,13 +69,15 @@ redirect URI in Google Cloud.
 
    Click **Update**, then **Save**.
 
-5. **Publish it, so you don't have to sign in again every week.** Go to **Audience** and click
-   **Publish app**, then confirm, so the status reads **In production**.
-   - In **Testing** mode Google expires the grant after 7 days, so you'd be reconnecting weekly.
-   - In production you don't need verification for personal use. You'll see a
-     "Google hasn't verified this app" screen once per account, and the app is limited to 100
-     users, which is fine for this. If the console pushes you to submit for verification, you can
-     ignore that.
+5. **Add yourself as a test user.** Go to **Audience → Test users → Add users** and add both
+   Gmail addresses. Leave the app in **Testing**; that needs no domain or homepage. (Test users can
+   only be added while the app is in Testing.)
+   - Google may expire a Testing grant after about 7 days. If that happens, the account shows
+     **signed out** and you click **Reconnect** once. You don't get logged out of Google.
+   - **Optional, to avoid that:** publish to **In production**. That needs a homepage and a
+     privacy-policy page on a domain you've verified. A free `<you>.github.io` GitHub Pages site,
+     verified in Google Search Console, usually works. You still don't need Google's app
+     verification for personal use; you'll see an "unverified app" screen once per account.
 
 6. **Create the OAuth client.** Go to **Clients → Create client**:
    - Application type: **Web application**. Not "Chrome Extension", which only supports the

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mail Counter</title>
+    <meta
+      name="description"
+      content="A Chrome extension that shows the unread count of several Gmail accounts in one toolbar badge."
+    />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <div class="hero">
+        <div class="logo">
+          <img src="icon.svg" alt="" />
+          <span class="badge">5</span>
+        </div>
+        <div>
+          <h1>Mail Counter</h1>
+          <p class="tagline">Unread counts for all your Gmail accounts, in one toolbar badge.</p>
+        </div>
+      </div>
+
+      <ul class="features">
+        <li>
+          <strong>Several accounts</strong>
+          Add each Gmail account once. The badge shows the total; the popup shows each account.
+        </li>
+        <li>
+          <strong>Never signs you out</strong>
+          It only reads tokens from your existing Google session. It never touches cookies or signs
+          you in or out.
+        </li>
+        <li>
+          <strong>Minimal access</strong>
+          It reads label unread counts only. It never sees your messages, subjects or senders.
+        </li>
+      </ul>
+
+      <h2>What it does</h2>
+      <p>
+        Mail Counter is a small, open-source Chrome extension. Once a minute it asks the Gmail API
+        how many unread conversations are in each connected account's Inbox, and it shows the total
+        on its toolbar icon. Click the icon to see the count for each account, and click an account
+        to open its Gmail.
+      </p>
+      <p>
+        If Google needs you to approve access again, the account is marked
+        <em>signed out</em> and you click <em>Reconnect</em>. Nothing happens to your Google
+        session.
+      </p>
+
+      <h2>What it can access</h2>
+      <p>When you connect an account, Google asks you to allow:</p>
+      <ul>
+        <li>
+          <strong>Your email address</strong> (<code>openid</code>, <code>email</code>), to tell
+          your accounts apart.
+        </li>
+        <li>
+          <strong>Your Gmail labels</strong> (<code>gmail.labels</code>), to read the unread count
+          of your Inbox. Mail Counter only reads; it never creates, changes or deletes labels.
+        </li>
+      </ul>
+      <p>
+        Everything stays in your browser. There is no server, no analytics and no third party. See
+        the <a href="privacy.html">privacy policy</a> for details.
+      </p>
+
+      <h2>Install</h2>
+      <p>
+        Mail Counter isn't in the Chrome Web Store. You build it from source and load it as an
+        unpacked extension. You'll need <a href="https://bun.com">Bun</a> and your own Google Cloud
+        OAuth client:
+      </p>
+      <pre><code>git clone https://github.com/irondsd/mail-counter.git
+cd mail-counter
+bun install
+cp .env.example .env   # add your OAuth client ID
+bun run build          # then load dist/ in chrome://extensions</code></pre>
+      <p>
+        The <a href="https://github.com/irondsd/mail-counter#readme">README</a> walks through the
+        Google Cloud setup step by step.
+      </p>
+    </main>
+
+    <footer>
+      <nav>
+        <a href="privacy.html">Privacy policy</a>
+        <a href="https://github.com/irondsd/mail-counter">Source code</a>
+        <a href="https://github.com/irondsd/mail-counter/issues">Contact</a>
+      </nav>
+      Mail Counter is not affiliated with or endorsed by Google. Gmail is a trademark of Google LLC.
+    </footer>
+  </body>
+</html>
