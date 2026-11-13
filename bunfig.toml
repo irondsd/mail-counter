@@ -1,0 +1,8 @@
+[fmt]
+printWidth = 100
+ignorePatterns = [".claude/"]
+
+[lint.rules]
+"eqeqeq" = ["error", "smart"]
+"no-console" = "off"
+"prefer-const" = "error"

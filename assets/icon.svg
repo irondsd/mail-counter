@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!--
+    Envelope: a rounded body with the flap "V" cut out (transparent), so the
+    toolbar shows through on light and dark themes alike.
+    Change the fill to recolor; `bun run icons` regenerates the PNGs.
+  -->
+  <defs>
+    <mask id="flap-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+      <rect width="128" height="128" fill="#fff" />
+      <path
+        d="M -4 36 L 64 75 L 132 36"
+        fill="none"
+        stroke="#000"
+        stroke-width="11"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+      />
+    </mask>
+  </defs>
+  <rect x="6" y="20" width="116" height="88" rx="18" fill="#2563eb" mask="url(#flap-cut)" />
+</svg>

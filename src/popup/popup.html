@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mail Counter</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Mail Counter</h1>
+      <button id="refresh" class="icon" type="button" title="Check now" aria-label="Check now">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" />
+        </svg>
+      </button>
+    </header>
+
+    <p id="notice" class="notice" hidden></p>
+    <ul id="accounts"></ul>
+    <p id="empty" class="empty" hidden>No accounts yet.</p>
+
+    <footer>
+      <button id="add" type="button">Add Gmail account</button>
+      <span id="checked" class="muted"></span>
+    </footer>
+
+    <template id="row">
+      <li>
+        <button class="open" type="button">
+          <span class="email"></span>
+          <span class="count"></span>
+        </button>
+        <button class="reconnect" type="button" hidden>Reconnect</button>
+        <button
+          class="remove icon"
+          type="button"
+          title="Remove account"
+          aria-label="Remove account"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
+      </li>
+    </template>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
