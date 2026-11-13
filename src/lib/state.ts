@@ -47,3 +47,49 @@ export function inboxToOpenDirectly(states: AccountState[]): string | null {
   if (states.some((s) => s.status !== "ok" || (s.unread ?? 0) > 0)) return null;
   return states[0]!.email;
 }
+
+/** Timers and alarms drift a little; don't skip a check over a moment's difference. */
+const slackMs = (intervalSeconds: number) => Math.min(5_000, intervalSeconds * 200);
+
+/** Whether an account checked at `checkedAt` should be checked again. */
+export function isDue(
+  checkedAt: number | undefined,
+  intervalSeconds: number,
+  now: number,
+): boolean {
+  if (!checkedAt) return true;
+  return now - checkedAt >= intervalSeconds * 1000 - slackMs(intervalSeconds);
+}
+
+/** Milliseconds until the next account is due (0 if one already is), or null with none. */
+export function msUntilNextCheck(
+  accounts: { checkedAt?: number; intervalSeconds: number }[],
+  now: number,
+): number | null {
+  if (accounts.length === 0) return null;
+  return Math.max(
+    0,
+    Math.min(
+      ...accounts.map(({ checkedAt, intervalSeconds }) =>
+        checkedAt ? checkedAt + intervalSeconds * 1000 - now : 0,
+      ),
+    ),
+  );
+}
+
+/**
+ * True when a check turned up mail that wasn't there before: a new unread conversation, or a
+ * newer message in one. Accounts that were just added or were signed out don't count, so
+ * connecting an account with a full inbox stays quiet.
+ */
+export function newMailArrived(previous: AccountState[], next: AccountState[]): boolean {
+  return next.some((account) => {
+    const before = previous.find((p) => p.email === account.email);
+    if (account.status !== "ok" || before?.status !== "ok" || !before.threads) return false;
+    const known = new Map(before.threads.map((t) => [t.id, t.date]));
+    return (account.threads ?? []).some((t) => {
+      const date = known.get(t.id);
+      return date === undefined || t.date > date;
+    });
+  });
+}

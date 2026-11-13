@@ -10,6 +10,16 @@ import { createManifest } from "../src/manifest.ts";
 const root = new URL("..", import.meta.url).pathname;
 const out = `${root}dist`;
 
+/** HTML and CSS copied as-is next to the bundled scripts. */
+const PAGES = [
+  "ui/base.css",
+  "popup/popup.html",
+  "popup/popup.css",
+  "options/options.html",
+  "options/options.css",
+  "offscreen/offscreen.html",
+];
+
 async function build(): Promise<boolean> {
   const started = performance.now();
 
@@ -28,7 +38,12 @@ async function build(): Promise<boolean> {
   await rm(out, { recursive: true, force: true });
 
   const result = await Bun.build({
-    entrypoints: [`${root}src/background.ts`, `${root}src/popup/popup.ts`],
+    entrypoints: [
+      `${root}src/background.ts`,
+      `${root}src/popup/popup.ts`,
+      `${root}src/options/options.ts`,
+      `${root}src/offscreen/offscreen.ts`,
+    ],
     outdir: out,
     target: "browser",
     format: "esm",
@@ -48,8 +63,7 @@ async function build(): Promise<boolean> {
 
   await Promise.all([
     cp(`${root}public`, out, { recursive: true }),
-    cp(`${root}src/popup/popup.html`, `${out}/popup.html`),
-    cp(`${root}src/popup/popup.css`, `${out}/popup.css`),
+    ...PAGES.map((file) => cp(`${root}src/${file}`, `${out}/${file.split("/").pop()}`)),
     Bun.write(
       `${out}/manifest.json`,
       `${JSON.stringify(createManifest({ version, key }), null, 2)}\n`,

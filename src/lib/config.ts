@@ -17,8 +17,11 @@ export const COUNT_LABEL = "INBOX";
 /** How many unread conversations per account the popup previews. */
 export const MAX_PREVIEW_THREADS = 25;
 
-/** Polling interval. Chrome alarms can't fire more often than every 30s. */
-export const POLL_MINUTES = 1;
+/**
+ * Backstop alarm that restarts checking if Chrome stops the service worker. Chrome alarms can't
+ * fire more often than every 30 seconds; shorter per-account intervals run on a timer.
+ */
+export const POLL_MINUTES = 0.5;
 
 /** Refresh the access token this long before it actually expires. */
 export const TOKEN_EXPIRY_MARGIN_MS = 60_000;

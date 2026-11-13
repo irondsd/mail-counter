@@ -13,15 +13,23 @@ click **Reconnect**.
 - **Badge:** total unread conversations in Inbox across accounts. Amber means an account needs
   attention; hover for details.
 - **Click with nothing unread:** opens Gmail (the first account).
-- **Click with unread mail:** opens the popup with a preview of each unread conversation. Hover
-  one for **Open**, **Mark as read**, **Archive** (also marks it read) and **Report spam**. Click
-  it to read the email inside the popup. With exactly one unread email, the popup opens straight
-  to it.
-- **Right-click the icon:** **Open** any account's inbox, or **Accounts…** to add, reconnect or
-  remove accounts.
+- **Click with unread mail:** opens the popup with a card for each unread conversation (sender,
+  subject and the first lines of the email). Hover one for **Open**, **Mark as read**,
+  **Archive** (also marks it read) and **Report spam**. Click a card to expand it and read the
+  whole email in place; click again or press Esc to fold it. With exactly one unread email, it
+  opens already expanded.
+- **Right-click the icon:** **Open** any account's inbox, or **Options**.
+- **Options page:** add, reconnect and remove accounts; how often to check each account (10 seconds
+  to 10 minutes); the new-mail chime and its volume.
+- **New-mail chime:** a short sound when a check finds a new unread conversation or a new
+  message in one. Connecting an account doesn't chime for mail already there.
 - **Email preview:** scripts, forms and remote images are blocked, so tracking pixels don't
   report that you opened it. **Show images** loads them. Links open in a new tab.
-- **Polling:** every minute, plus whenever the popup opens.
+- **Polling:** each account on its own interval (default every minute), plus all of them whenever
+  the popup opens. Chrome alarms can't fire more often than every 30 seconds, so shorter
+  intervals run on a timer and a 30-second alarm restarts it if Chrome puts the extension to
+  sleep. A check costs about 11 of Gmail's quota units, so even every 10 seconds uses well under 1%
+  of Google's per-user limit.
 
 ## Development
 
@@ -40,6 +48,9 @@ bun run icons      # assets/icon.svg → public/icons/*.png
 | --------------------- | ----------------------------------------------------------------- |
 | `src/background.ts`   | service worker: OAuth, polling, badge, actions, click behavior    |
 | `src/popup/`          | popup UI                                                          |
+| `src/options/`        | options page: accounts, check intervals, sound                    |
+| `src/offscreen/`      | hidden page that plays the chime (service workers can't)          |
+| `src/ui/base.css`     | colors and buttons shared by the popup and options page           |
 | `src/lib/`            | pure logic (OAuth URLs, Gmail API, badge), unit-tested in `test/` |
 | `src/lib/config.ts`   | scopes, which label to count, poll interval                       |
 | `src/manifest.ts`     | manifest, generated into `dist/` at build time                    |
@@ -110,7 +121,8 @@ redirect URI in Google Cloud.
    unpacked**, and pick the `dist/` folder. The ID shown should be
    `nlmlamifemkcdemlkldjenngmcjbidek`. Pin the envelope icon to the toolbar.
 
-9. **Connect your accounts.** Click the icon, then **Add Gmail account**, and pick an account. On
+9. **Connect your accounts.** Click the icon, then **Add an account in Options** (later: right-click
+   the icon → **Options**). Click **Add Gmail account** and pick an account. On
    "Google hasn't verified this app", click **Advanced → Go to Mail Counter (unsafe)**, then
    **Continue**. Repeat for the second account.
 
@@ -121,7 +133,7 @@ After a code change: `bun run build`, then click the reload arrow on the extensi
 
 Clone the repo, add the same `.env`, run `bun run build`, and load `dist/`. The ID is the same, so
 the same OAuth client works. If Chrome Sync is on, the list of accounts carries over and the
-extension tries to connect them silently. Otherwise click **Add Gmail account** once per account.
+extension tries to connect them silently. Otherwise click **Add Gmail account** in Options once per account.
 Google remembers your earlier approval, so it's only the account picker.
 
 ### How sign-in stays alive

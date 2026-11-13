@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mail Counter options</title>
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1 class="brand"><img src="icons/icon-48.png" alt="" />Mail Counter</h1>
+
+      <p id="notice" class="notice" hidden></p>
+
+      <section class="card">
+        <h2>Accounts</h2>
+        <p class="hint">
+          Each account is checked on its own schedule. Opening the popup always checks all of them.
+        </p>
+        <ul id="accounts" class="rows"></ul>
+        <p id="no-accounts" class="hint" hidden>No accounts yet.</p>
+        <button id="add" class="primary" type="button">Add Gmail account</button>
+      </section>
+
+      <section class="card">
+        <h2>Sound</h2>
+        <label class="check">
+          <input id="sound" type="checkbox" />
+          Play a chime when new mail arrives
+        </label>
+        <div class="volume">
+          <label for="volume">Volume</label>
+          <input id="volume" type="range" min="0" max="100" step="5" />
+          <button id="test-sound" class="link" type="button">Play</button>
+        </div>
+      </section>
+
+      <p class="muted links">
+        <a href="https://irondsd.github.io/mail-counter/" target="_blank" rel="noreferrer"
+          >Homepage</a
+        >
+        ·
+        <a
+          href="https://irondsd.github.io/mail-counter/privacy.html"
+          target="_blank"
+          rel="noreferrer"
+          >Privacy policy</a
+        >
+      </p>
+    </main>
+
+    <template id="account-tpl">
+      <li class="row">
+        <div class="who">
+          <span class="email"></span>
+          <span class="status"></span>
+        </div>
+        <label class="interval">
+          Check every
+          <select></select>
+        </label>
+        <button class="reconnect link" type="button" hidden>Reconnect</button>
+        <button class="remove link danger" type="button">Remove</button>
+      </li>
+    </template>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

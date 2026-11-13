@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <title>Mail Counter</title>
+    <link rel="stylesheet" href="base.css" />
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
@@ -10,8 +11,11 @@
       <symbol id="i-refresh" viewBox="0 0 24 24">
         <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" />
       </symbol>
-      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></symbol>
-      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24">
+        <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+        <circle cx="16" cy="7" r="2" />
+        <circle cx="8" cy="17" r="2" />
+      </symbol>
       <symbol id="i-open" viewBox="0 0 24 24">
         <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
       </symbol>
@@ -27,7 +31,11 @@
     </svg>
 
     <header>
-      <h1>Mail Counter</h1>
+      <h1 class="brand"><img src="icons/icon-48.png" alt="" />Mail Counter</h1>
+      <span id="checked" class="muted"></span>
+      <button id="options" class="icon" type="button" title="Options" aria-label="Options">
+        <svg><use href="#i-settings" /></svg>
+      </button>
       <button id="refresh" class="icon" type="button" title="Check now" aria-label="Check now">
         <svg><use href="#i-refresh" /></svg>
       </button>
@@ -35,34 +43,11 @@
 
     <p id="notice" class="notice" hidden></p>
 
-    <section id="list-view">
-      <div id="accounts"></div>
-      <p id="empty" class="empty" hidden>No accounts yet.</p>
-    </section>
-
-    <section id="detail-view" hidden>
-      <div class="detail-bar">
-        <button id="back" class="icon" type="button" title="Back" aria-label="Back">
-          <svg><use href="#i-back" /></svg>
-        </button>
-        <div class="actions" id="detail-actions"></div>
-      </div>
-      <div class="detail-head">
-        <h2 id="detail-subject"></h2>
-        <div class="detail-meta">
-          <span id="detail-from" class="from"></span>
-          <span id="detail-date" class="date"></span>
-        </div>
-      </div>
-      <p id="detail-status" class="detail-status">Loading…</p>
-      <button id="show-images" class="link" type="button" hidden>Show images</button>
-      <iframe id="detail-frame" title="Email preview" hidden></iframe>
-    </section>
-
-    <footer>
-      <button id="add" class="link" type="button">Add Gmail account</button>
-      <span id="checked" class="muted"></span>
-    </footer>
+    <main id="accounts"></main>
+    <div id="empty" class="empty" hidden>
+      <p>No Gmail accounts yet.</p>
+      <button id="open-options" class="primary" type="button">Add an account in Options</button>
+    </div>
 
     <template id="account-tpl">
       <section class="account">
@@ -72,14 +57,6 @@
             <span class="count"></span>
           </button>
           <button class="reconnect link" type="button" hidden>Reconnect</button>
-          <button
-            class="remove icon"
-            type="button"
-            title="Remove account"
-            aria-label="Remove account"
-          >
-            <svg><use href="#i-close" /></svg>
-          </button>
         </div>
         <p class="account-error" hidden></p>
         <ul class="threads"></ul>
@@ -89,7 +66,7 @@
 
     <template id="thread-tpl">
       <li class="thread">
-        <button class="thread-main" type="button">
+        <button class="thread-main" type="button" aria-expanded="false">
           <span class="line">
             <span class="from"></span>
             <span class="date"></span>
@@ -98,6 +75,11 @@
           <span class="snippet"></span>
         </button>
         <div class="actions"></div>
+        <div class="thread-body" hidden>
+          <p class="body-status">Loading…</p>
+          <button class="show-images link" type="button" hidden>Show images</button>
+          <iframe class="body-frame" title="Email" hidden></iframe>
+        </div>
       </li>
     </template>
 

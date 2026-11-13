@@ -51,3 +51,10 @@ export type Message =
   | { type: "get-body"; email: string; messageId: string };
 
 export type Reply<T = unknown> = { ok: true; data?: T } | { ok: false; error: string };
+
+/** Background → offscreen document. */
+export interface OffscreenMessage {
+  target: "offscreen";
+  type: "chime";
+  volume: number;
+}

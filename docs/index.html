@@ -42,18 +42,22 @@
 
       <h2>What it does</h2>
       <p>
-        Mail Counter is a small, open-source Chrome extension. Once a minute it asks the Gmail API
-        how many unread conversations are in each connected account's Inbox, and it shows the total
-        on its toolbar icon.
+        Mail Counter is a small, open-source Chrome extension. On a schedule you choose for each
+        account (from every 10 seconds to every 10 minutes; once a minute by default) it asks the
+        Gmail API how many unread conversations are in that account's Inbox, and it shows the total
+        on its toolbar icon. A short chime plays when new mail arrives; you can turn it off.
       </p>
       <ul>
         <li>Nothing unread: clicking the icon opens Gmail.</li>
         <li>
           Unread mail: clicking the icon shows a preview of each unread conversation, with buttons
           to open it in Gmail, mark it as read, archive it or report it as spam. Click a preview to
-          read the email without leaving the page.
+          expand it and read the whole email without leaving the page.
         </li>
-        <li>Right-click the icon to open any account's inbox or manage your accounts.</li>
+        <li>
+          Right-click the icon to open any account's inbox, or open Options to manage accounts, how
+          often each is checked, and the sound.
+        </li>
       </ul>
       <p>
         Email previews are locked down: scripts, forms and remote images are blocked, so tracking

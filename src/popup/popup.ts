@@ -1,5 +1,4 @@
 import { formatCount } from "../lib/badge.ts";
-import { GOOGLE_CLIENT_ID } from "../lib/config.ts";
 import { buildPreviewDocument, formatDate, hasRemoteImages } from "../lib/preview.ts";
 import { removeThread } from "../lib/state.ts";
 import type {
@@ -13,28 +12,26 @@ import type {
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
-const listView = $("list-view");
 const accountsEl = $("accounts");
 const empty = $("empty");
 const notice = $("notice");
 const checked = $("checked");
-const footer = document.querySelector("footer")!;
 const refreshButton = $<HTMLButtonElement>("refresh");
-const addButton = $<HTMLButtonElement>("add");
 const accountTpl = $<HTMLTemplateElement>("account-tpl");
 const threadTpl = $<HTMLTemplateElement>("thread-tpl");
 
-const detailView = $("detail-view");
-const detailActions = $("detail-actions");
-const detailSubject = $("detail-subject");
-const detailFrom = $("detail-from");
-const detailDate = $("detail-date");
-const detailStatus = $("detail-status");
-const detailFrame = $<HTMLIFrameElement>("detail-frame");
-const showImagesButton = $<HTMLButtonElement>("show-images");
+const FRAME_MIN = 120;
 
 let accounts: AccountState[] = [];
-let detail: { email: string; thread: ThreadSummary; body?: MessageBody } | null = null;
+
+/** The card showing its whole email. Its body is kept here so re-renders don't refetch it. */
+let expanded: {
+  email: string;
+  threadId: string;
+  body?: MessageBody;
+  error?: string;
+  images: boolean;
+} | null = null;
 
 const ACTIONS: { action: ThreadAction | "open"; icon: string; label: string }[] = [
   { action: "open", icon: "i-open", label: "Open in Gmail" },
@@ -62,6 +59,11 @@ function el<T extends Element>(root: ParentNode, selector: string): T {
   return root.querySelector<T>(selector)!;
 }
 
+function openOptions(): void {
+  void chrome.runtime.openOptionsPage();
+  window.close();
+}
+
 function actionButtons(email: string, thread: ThreadSummary): HTMLButtonElement[] {
   return ACTIONS.map(({ action, icon, label }) => {
     const button = document.createElement("button");
@@ -81,21 +83,60 @@ function actionButtons(email: string, thread: ThreadSummary): HTMLButtonElement[
 
 const totalThreads = () => accounts.reduce((n, a) => n + (a.threads?.length ?? 0), 0);
 const allOk = () => accounts.every((a) => a.status === "ok");
+const isExpanded = (email: string, thread: ThreadSummary) =>
+  expanded?.email === email && expanded.threadId === thread.id;
 
 // ---------------------------------------------------------------------------
-// List view
+// Rendering
 // ---------------------------------------------------------------------------
+
+/** Fills an open card's body area from `expanded`. */
+function renderBody(li: HTMLElement): void {
+  if (!expanded) return;
+  const status = el<HTMLElement>(li, ".body-status");
+  const frame = el<HTMLIFrameElement>(li, ".body-frame");
+  const showImages = el<HTMLButtonElement>(li, ".show-images");
+  el<HTMLElement>(li, ".thread-body").hidden = false;
+
+  if (!expanded.body) {
+    status.textContent = expanded.error ?? "Loading…";
+    status.hidden = false;
+    frame.hidden = true;
+    showImages.hidden = true;
+    return;
+  }
+  status.hidden = true;
+  showImages.hidden = expanded.images || !hasRemoteImages(expanded.body.html);
+  frame.srcdoc = buildPreviewDocument(expanded.body, expanded.images);
+  frame.hidden = false;
+}
 
 function renderThread(email: string, thread: ThreadSummary): HTMLLIElement {
   const li = threadTpl.content.firstElementChild!.cloneNode(true) as HTMLLIElement;
-  el(li, ".from").textContent =
-    thread.count > 1 ? `${thread.fromName} (${thread.count})` : thread.fromName;
-  el<HTMLElement>(li, ".from").title = thread.fromEmail;
+  const main = el<HTMLButtonElement>(li, ".thread-main");
+  const from = el<HTMLElement>(li, ".from");
+  from.textContent = thread.count > 1 ? `${thread.fromName} (${thread.count})` : thread.fromName;
+  from.title = thread.fromEmail;
   el(li, ".date").textContent = formatDate(thread.date);
   el(li, ".subject").textContent = thread.subject;
   el(li, ".snippet").textContent = thread.snippet;
-  el(li, ".thread-main").addEventListener("click", () => void showDetail(email, thread));
   el(li, ".actions").append(...actionButtons(email, thread));
+  main.addEventListener("click", () => toggle(email, thread));
+
+  el(li, ".show-images").addEventListener("click", () => {
+    if (!expanded) return;
+    expanded.images = true;
+    renderBody(li);
+  });
+
+  const frame = el<HTMLIFrameElement>(li, ".body-frame");
+  frame.addEventListener("load", () => fitFrame(frame));
+
+  if (isExpanded(email, thread)) {
+    li.classList.add("expanded");
+    main.setAttribute("aria-expanded", "true");
+    renderBody(li);
+  }
   return li;
 }
 
@@ -128,12 +169,6 @@ function renderAccount(account: AccountState): HTMLElement {
   reconnect.hidden = account.status !== "needs-auth";
   reconnect.addEventListener("click", () => void send({ type: "reconnect", email: account.email }));
 
-  el(section, ".remove").addEventListener("click", () => {
-    if (confirm(`Stop watching ${account.email}?`)) {
-      void send({ type: "remove", email: account.email });
-    }
-  });
-
   const threads = account.threads ?? [];
   el(section, ".threads").append(...threads.map((t) => renderThread(account.email, t)));
 
@@ -150,62 +185,82 @@ function renderAccount(account: AccountState): HTMLElement {
   return section;
 }
 
-function renderList(): void {
+function render(): void {
+  // An open card whose conversation is gone (read elsewhere, archived…) closes.
+  if (
+    expanded &&
+    !accounts.some(
+      (a) => a.email === expanded!.email && a.threads?.some((t) => t.id === expanded!.threadId),
+    )
+  ) {
+    expanded = null;
+  }
+  const scroll = accountsEl.scrollTop;
   accountsEl.replaceChildren(...accounts.map(renderAccount));
+  accountsEl.scrollTop = scroll;
   empty.hidden = accounts.length > 0;
   const last = Math.max(0, ...accounts.map((a) => a.checkedAt ?? 0));
   checked.textContent = last ? `Checked ${formatDate(last)}` : "";
 }
 
-// ---------------------------------------------------------------------------
-// Detail view
-// ---------------------------------------------------------------------------
-
-function renderBody(allowImages: boolean): void {
-  if (!detail?.body) return;
-  detailFrame.srcdoc = buildPreviewDocument(detail.body, allowImages);
-  detailFrame.hidden = false;
-  detailStatus.hidden = true;
-  showImagesButton.hidden = allowImages || !hasRemoteImages(detail.body.html);
+/**
+ * The email frame grows to fit its content, up to what fits in the popup below the card's
+ * header; longer emails scroll inside it. The card scrolls to the top so the sender, subject
+ * and buttons stay in view.
+ */
+function fitFrame(frame: HTMLIFrameElement): void {
+  const doc = frame.contentDocument;
+  if (!doc?.body || !frame.srcdoc) return;
+  // Links in the email open in a fresh tab (no opener, no referrer).
+  doc.addEventListener("click", (event) => {
+    const link = (event.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+    if (!link) return;
+    event.preventDefault();
+    if (/^(https?|mailto):/i.test(link.href)) void chrome.tabs.create({ url: link.href });
+  });
+  requestAnimationFrame(() => {
+    const card = frame.closest<HTMLElement>(".thread");
+    const head = card?.closest(".account")?.querySelector<HTMLElement>(".account-head");
+    if (!card) return;
+    const above = frame.getBoundingClientRect().top - card.getBoundingClientRect().top;
+    const room = accountsEl.clientHeight - (head?.offsetHeight ?? 0) - above - 14;
+    const height = doc.documentElement.scrollHeight + 2;
+    frame.style.height = `${Math.max(FRAME_MIN, Math.min(height, room))}px`;
+    accountsEl.scrollTop +=
+      card.getBoundingClientRect().top -
+      accountsEl.getBoundingClientRect().top -
+      (head?.offsetHeight ?? 0);
+  });
 }
 
-async function showDetail(email: string, thread: ThreadSummary): Promise<void> {
-  detail = { email, thread };
-  listView.hidden = true;
-  footer.hidden = true;
-  detailView.hidden = false;
+// ---------------------------------------------------------------------------
+// Expanding a card
+// ---------------------------------------------------------------------------
 
-  detailSubject.textContent = thread.subject;
-  detailFrom.textContent = thread.fromName;
-  detailFrom.title = thread.fromEmail;
-  detailDate.textContent = formatDate(thread.date);
-  detailActions.replaceChildren(...actionButtons(email, thread));
-  detailStatus.textContent = "Loading…";
-  detailStatus.hidden = false;
-  detailFrame.hidden = true;
-  detailFrame.srcdoc = "";
-  showImagesButton.hidden = true;
+function toggle(email: string, thread: ThreadSummary): void {
+  if (isExpanded(email, thread)) {
+    collapse();
+    return;
+  }
+  expanded = { email, threadId: thread.id, images: false };
+  render();
+  void loadBody(email, thread);
+}
 
+function collapse(): void {
+  expanded = null;
+  render();
+}
+
+async function loadBody(email: string, thread: ThreadSummary): Promise<void> {
   const reply = await send<MessageBody>(
     { type: "get-body", email, messageId: thread.messageId },
     true, // the error shows in place of the body
   );
-  if (detail?.thread.id !== thread.id) return; // went back or opened another
-  if (!reply.ok || !reply.data) {
-    detailStatus.textContent = reply.ok ? "Couldn't load this email." : reply.error;
-    return;
-  }
-  detail.body = reply.data;
-  renderBody(false);
-}
-
-function showList(): void {
-  detail = null;
-  detailFrame.srcdoc = "";
-  detailView.hidden = true;
-  listView.hidden = false;
-  footer.hidden = false;
-  renderList();
+  if (!isExpanded(email, thread)) return; // closed or opened another meanwhile
+  if (reply.ok && reply.data) expanded!.body = reply.data;
+  else expanded!.error = reply.ok ? "Couldn't load this email." : reply.error;
+  render();
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +279,8 @@ async function runAction(
 ): Promise<void> {
   // Update right away; the background confirms (or reverts on the next refresh).
   accounts = removeThread(accounts, email, thread.id);
-  showList();
+  if (isExpanded(email, thread)) expanded = null;
+  render();
 
   const reply = await send({ type: "thread-action", email, threadId: thread.id, action });
   if (!reply.ok) {
@@ -249,56 +305,40 @@ async function refresh(): Promise<void> {
 // Wiring
 // ---------------------------------------------------------------------------
 
-// Links in the email open in a fresh tab (no opener, no referrer); the frame fits its content.
-detailFrame.addEventListener("load", () => {
-  const doc = detailFrame.contentDocument;
-  if (!doc?.body) return;
-  doc.addEventListener("click", (event) => {
-    const link = (event.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
-    if (!link) return;
-    event.preventDefault();
-    if (/^(https?|mailto):/i.test(link.href)) void chrome.tabs.create({ url: link.href });
-  });
-  requestAnimationFrame(() => {
-    const height = doc.documentElement.scrollHeight + 2;
-    detailFrame.style.height = `${Math.min(Math.max(height, 120), 400)}px`;
-  });
-});
-
 refreshButton.addEventListener("click", () => void refresh());
-$("back").addEventListener("click", showList);
-showImagesButton.addEventListener("click", () => renderBody(true));
-
-// The Google window takes focus and closes this popup; the background worker
-// finishes sign-in on its own.
-addButton.addEventListener("click", () => void send({ type: "add-account" }));
+$("options").addEventListener("click", openOptions);
+$("open-options").addEventListener("click", openOptions);
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && detail) {
+  if (event.key === "Escape" && expanded) {
     event.preventDefault();
-    showList();
+    collapse();
   }
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local" || !changes.accounts) return;
   accounts = (changes.accounts.newValue as AccountState[] | undefined) ?? [];
-  if (!detail) renderList();
+  if (!expanded) {
+    render();
+    return;
+  }
+  // Keep the open email steady; closing it renders the update. Re-render now only if its
+  // conversation went away.
+  const stillThere = accounts.some(
+    (a) => a.email === expanded!.email && a.threads?.some((t) => t.id === expanded!.threadId),
+  );
+  if (!stillThere) render();
 });
-
-if (!GOOGLE_CLIENT_ID) {
-  showNotice("No OAuth client ID configured. Set PUBLIC_GOOGLE_CLIENT_ID in .env and rebuild.");
-  addButton.disabled = true;
-}
 
 const stored = await chrome.storage.local.get("accounts");
 accounts = (stored.accounts as AccountState[] | undefined) ?? [];
-renderList();
+render();
 
-// One unread email: go straight to its preview.
+// One unread email: open it straight away.
 if (totalThreads() === 1 && allOk()) {
   const account = accounts.find((a) => a.threads?.length)!;
-  void showDetail(account.email, account.threads![0]!);
+  toggle(account.email, account.threads![0]!);
 }
 
 void refresh();

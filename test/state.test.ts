@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
   inboxToOpenDirectly,
+  isDue,
   mergeThreads,
+  msUntilNextCheck,
+  newMailArrived,
   removeThread,
   threadsToFetch,
 } from "../src/lib/state.ts";
@@ -92,5 +95,70 @@ describe("inboxToOpenDirectly", () => {
 
   test("no accounts shows the popup so you can add one", () => {
     expect(inboxToOpenDirectly([])).toBeNull();
+  });
+});
+
+describe("isDue", () => {
+  const t = 1_000_000;
+  test("never checked → due", () => expect(isDue(undefined, 60, t)).toBe(true));
+  test("waits for the interval", () => {
+    expect(isDue(t, 300, t + 240_000)).toBe(false);
+    expect(isDue(t, 300, t + 300_000)).toBe(true);
+  });
+  test("a wake-up a moment early still counts", () => {
+    expect(isDue(t, 60, t + 57_000)).toBe(true);
+    expect(isDue(t, 10, t + 8_500)).toBe(true);
+    expect(isDue(t, 10, t + 5_000)).toBe(false);
+  });
+});
+
+describe("msUntilNextCheck", () => {
+  const t = 1_000_000;
+  test("waits for whichever account is due first", () => {
+    const accounts = [
+      { checkedAt: t, intervalSeconds: 60 },
+      { checkedAt: t - 5_000, intervalSeconds: 10 },
+    ];
+    expect(msUntilNextCheck(accounts, t)).toBe(5_000);
+  });
+  test("overdue or never checked → now", () => {
+    expect(msUntilNextCheck([{ checkedAt: t - 99_000, intervalSeconds: 10 }], t)).toBe(0);
+    expect(msUntilNextCheck([{ intervalSeconds: 10 }], t)).toBe(0);
+  });
+  test("no accounts → nothing to schedule", () => {
+    expect(msUntilNextCheck([], t)).toBeNull();
+  });
+});
+
+describe("newMailArrived", () => {
+  const at = (id: string, date: number) => ({ ...summary(id, "1"), date });
+  const ok = (threads: ThreadSummary[]): AccountState => ({
+    email: "a@x.com",
+    status: "ok",
+    unread: threads.length,
+    threads,
+  });
+
+  test("a new unread conversation", () => {
+    expect(newMailArrived([ok([at("a", 1)])], [ok([at("b", 2), at("a", 1)])])).toBe(true);
+  });
+
+  test("a new message in an unread conversation", () => {
+    expect(newMailArrived([ok([at("a", 1)])], [ok([at("a", 5)])])).toBe(true);
+  });
+
+  test("nothing new, or mail was read", () => {
+    expect(newMailArrived([ok([at("a", 1)])], [ok([at("a", 1)])])).toBe(false);
+    expect(newMailArrived([ok([at("a", 1), at("b", 1)])], [ok([at("a", 1)])])).toBe(false);
+  });
+
+  test("a just-added or just-reconnected account is quiet", () => {
+    expect(newMailArrived([], [ok([at("a", 1)])])).toBe(false);
+    const signedOut: AccountState = { email: "a@x.com", status: "needs-auth", unread: null };
+    expect(newMailArrived([signedOut], [ok([at("a", 1)])])).toBe(false);
+  });
+
+  test("an empty inbox getting its first email chimes", () => {
+    expect(newMailArrived([ok([])], [ok([at("a", 1)])])).toBe(true);
   });
 });

@@ -15,7 +15,7 @@ export function createManifest({ version, key }: ManifestInput) {
   return {
     manifest_version: 3,
     name: "Mail Counter",
-    description: "Unread counts for several Gmail accounts, via the Gmail API.",
+    description: "Unread Gmail for several accounts: badge, previews and quick actions.",
     version,
     key,
     icons,
@@ -24,9 +24,10 @@ export function createManifest({ version, key }: ManifestInput) {
       default_popup: "popup.html",
       default_icon: { 16: icons[16], 32: icons[32] },
     },
+    options_ui: { page: "options.html", open_in_tab: true },
     background: { service_worker: "background.js", type: "module" },
     // No host permissions: Google's APIs allow CORS, and the OAuth popup
-    // is handled by chrome.identity.
-    permissions: ["identity", "alarms", "storage", "contextMenus"],
+    // is handled by chrome.identity. `offscreen` plays the new-mail chime.
+    permissions: ["identity", "alarms", "storage", "contextMenus", "offscreen"],
   };
 }

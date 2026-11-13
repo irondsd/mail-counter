@@ -21,11 +21,26 @@ import {
   PermissionError,
 } from "./lib/gmail.ts";
 import { buildAuthUrl, needsInteraction, parseAuthRedirect } from "./lib/oauth.ts";
-import { inboxToOpenDirectly, mergeThreads, removeThread, threadsToFetch } from "./lib/state.ts";
-import type { AccountState, Message, Reply, ThreadSummary, Token } from "./lib/types.ts";
+import { intervalFor, normalizeSettings, type Settings } from "./lib/settings.ts";
+import {
+  inboxToOpenDirectly,
+  isDue,
+  mergeThreads,
+  msUntilNextCheck,
+  newMailArrived,
+  removeThread,
+  threadsToFetch,
+} from "./lib/state.ts";
+import type {
+  AccountState,
+  Message,
+  OffscreenMessage,
+  Reply,
+  ThreadSummary,
+  Token,
+} from "./lib/types.ts";
 
 const ALARM = "poll";
-const MENU_ACCOUNTS = "accounts";
 const MENU_OPEN_PREFIX = "open:";
 
 /** Silent sign-in isn't possible; the user has to click "Reconnect". */
@@ -41,6 +56,7 @@ const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e)
 // ---------------------------------------------------------------------------
 // Storage
 //   sync:  emails   – which accounts to watch (follows you to other devices)
+//          settings – sound and per-account check intervals (options page)
 //   local: tokens   – short-lived access tokens, per device
 //          accounts – last known state, rendered by the popup and badge
 // ---------------------------------------------------------------------------
@@ -52,6 +68,11 @@ async function getEmails(): Promise<string[]> {
 
 async function setEmails(emails: string[]): Promise<void> {
   await chrome.storage.sync.set({ emails });
+}
+
+async function getSettings(): Promise<Settings> {
+  const { settings } = await chrome.storage.sync.get("settings");
+  return normalizeSettings(settings);
 }
 
 async function getTokens(): Promise<Record<string, Token>> {
@@ -96,7 +117,7 @@ async function updateActionMode(states: AccountState[]): Promise<void> {
 
 let menuKey = "";
 
-/** Right-click menu on the toolbar icon: open any inbox, or manage accounts. */
+/** Right-click menu on the toolbar icon: open any inbox. Chrome adds "Options" itself. */
 async function updateMenu(states: AccountState[]): Promise<void> {
   const key = states.map((s) => s.email).join("\n");
   if (key === menuKey) return;
@@ -109,25 +130,44 @@ async function updateMenu(states: AccountState[]): Promise<void> {
       contexts: ["action"],
     });
   }
-  chrome.contextMenus.create({
-    id: MENU_ACCOUNTS,
-    title: "Accounts…",
-    contexts: ["action"],
-  });
 }
 
-/** Shows the popup even when a click would normally open Gmail. */
-async function showPopup(): Promise<void> {
-  await chrome.action.setPopup({ popup: "popup.html" });
-  try {
-    await chrome.action.openPopup();
-  } catch {
-    await chrome.windows.create({
-      url: chrome.runtime.getURL("popup.html"),
-      type: "popup",
-      width: 420,
-      height: 600,
+// ---------------------------------------------------------------------------
+// Sound: service workers can't play audio, so an offscreen document does.
+// ---------------------------------------------------------------------------
+
+let creatingOffscreen: Promise<void> | null = null;
+
+async function ensureOffscreen(): Promise<void> {
+  const url = chrome.runtime.getURL("offscreen.html");
+  const existing = await chrome.runtime.getContexts({
+    contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT],
+    documentUrls: [url],
+  });
+  if (existing.length) return;
+  creatingOffscreen ??= chrome.offscreen
+    .createDocument({
+      url,
+      reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
+      justification: "Play a short chime when new mail arrives",
+    })
+    .finally(() => {
+      creatingOffscreen = null;
     });
+  await creatingOffscreen;
+}
+
+async function chime(settings: Settings): Promise<void> {
+  if (!settings.sound || settings.volume <= 0) return;
+  try {
+    await ensureOffscreen();
+    await chrome.runtime.sendMessage({
+      target: "offscreen",
+      type: "chime",
+      volume: settings.volume,
+    } satisfies OffscreenMessage);
+  } catch (e) {
+    console.warn("Couldn't play the new-mail sound:", e);
   }
 }
 
@@ -218,7 +258,7 @@ async function connect(loginHint?: string): Promise<void> {
   await setToken(email, token);
   const emails = await getEmails();
   if (!emails.includes(email)) await setEmails([...emails, email]);
-  await refreshAll();
+  await refreshAll(true, email);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,41 +316,80 @@ async function checkAccount(
   }
 }
 
-async function doRefresh(): Promise<void> {
-  const [emails, previous] = await Promise.all([getEmails(), getStates()]);
+/**
+ * Checks the accounts that are due (all of them when `force`), keeping the rest as they were.
+ * `quietFor` is an account that was just connected: its existing mail isn't "new".
+ */
+async function doRefresh(force: boolean, quietFor?: string): Promise<void> {
+  const [emails, previous, settings] = await Promise.all([getEmails(), getStates(), getSettings()]);
+  const now = Date.now();
   const states = await Promise.all(
-    emails.map((email) =>
-      checkAccount(
-        email,
-        previous.find((p) => p.email === email),
-      ),
-    ),
+    emails.map((email) => {
+      const before = previous.find((p) => p.email === email);
+      const due = force || !before || isDue(before.checkedAt, intervalFor(settings, email), now);
+      return due ? checkAccount(email, before) : before;
+    }),
   );
   await setStates(states);
+  const comparable = previous.filter((p) => p.email !== quietFor);
+  if (newMailArrived(comparable, states)) await chime(settings);
 }
 
 let running: Promise<void> | null = null;
-let rerun = false;
+let queued: { force: boolean; quietFor?: string } | null = null;
 
-/** Runs one refresh at a time; a request during a run schedules one more. */
-function refreshAll(): Promise<void> {
+/** Runs one refresh at a time; requests during a run are merged into one more. */
+function refreshAll(force = true, quietFor?: string): Promise<void> {
   if (running) {
-    rerun = true;
+    queued = {
+      force: force || (queued?.force ?? false),
+      quietFor: quietFor ?? queued?.quietFor,
+    };
     return running;
   }
   running = (async () => {
-    do {
-      rerun = false;
-      await doRefresh();
-    } while (rerun);
+    let next: typeof queued = { force, quietFor };
+    while (next) {
+      queued = null;
+      await doRefresh(next.force, next.quietFor);
+      next = queued;
+    }
   })().finally(() => {
     running = null;
+    void scheduleNext();
   });
   return running;
 }
 
+// ---------------------------------------------------------------------------
+// Scheduling. Chrome alarms can't fire more often than every 30 seconds, so a timer wakes us
+// for the next account that's due. Each check calls extension APIs, which keeps the service
+// worker alive between short intervals; if Chrome stops it anyway, the alarm restarts the cycle.
+// ---------------------------------------------------------------------------
+
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+async function scheduleNext(): Promise<void> {
+  clearTimeout(timer);
+  const [states, settings] = await Promise.all([getStates(), getSettings()]);
+  const wait = msUntilNextCheck(
+    states.map((s) => ({
+      checkedAt: s.checkedAt,
+      intervalSeconds: intervalFor(settings, s.email),
+    })),
+    Date.now(),
+  );
+  if (wait === null || running) return;
+  timer = setTimeout(() => void refreshAll(false), Math.max(1_000, wait));
+}
+
 async function remove(email: string): Promise<void> {
   await setEmails((await getEmails()).filter((e) => e !== email));
+  const settings = await getSettings();
+  if (email in settings.checkEvery) {
+    delete settings.checkEvery[email];
+    await chrome.storage.sync.set({ settings });
+  }
   await setToken(email, undefined);
   await setStates((await getStates()).filter((s) => s.email !== email));
 }
@@ -358,33 +437,35 @@ async function handle(message: Message): Promise<unknown> {
 
 chrome.runtime.onInstalled.addListener(() => {
   menuKey = "\0"; // force a rebuild
-  void ensureAlarm().then(getStates).then(updateMenu).then(refreshAll);
+  void ensureAlarm()
+    .then(getStates)
+    .then(updateMenu)
+    .then(() => refreshAll());
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  void ensureAlarm().then(refreshAll);
+  void ensureAlarm().then(() => refreshAll());
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ALARM) void refreshAll();
+  if (alarm.name === ALARM) void refreshAll(false);
 });
 
 // Fires only when no popup is set, i.e. nothing is unread.
 chrome.action.onClicked.addListener(() => {
   void getStates().then((states) => {
     const email = inboxToOpenDirectly(states);
-    return email ? openTab(gmailUrl(email)) : showPopup();
+    return email ? openTab(gmailUrl(email)) : chrome.runtime.openOptionsPage();
   });
 });
 
 chrome.contextMenus.onClicked.addListener((info) => {
   const id = String(info.menuItemId);
-  if (id === MENU_ACCOUNTS) void showPopup();
-  else if (id.startsWith(MENU_OPEN_PREFIX))
-    void openTab(gmailUrl(id.slice(MENU_OPEN_PREFIX.length)));
+  if (id.startsWith(MENU_OPEN_PREFIX)) void openTab(gmailUrl(id.slice(MENU_OPEN_PREFIX.length)));
 });
 
 chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
+  if ((message as { target?: string }).target === "offscreen") return false;
   handle(message).then(
     (data) => sendResponse({ ok: true, data } satisfies Reply),
     (e: unknown) =>
@@ -402,4 +483,6 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
 // Other devices add accounts through storage.sync; pick them up right away.
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "sync" && changes.emails) void refreshAll();
+  // A new interval applies right away, not after the current wait.
+  if (area === "sync" && changes.settings) void scheduleNext();
 });
