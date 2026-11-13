@@ -2,17 +2,20 @@
 export const GOOGLE_CLIENT_ID = process.env.PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
 /**
- * `gmail.labels` is enough to read label unread counts and is lighter than
- * `gmail.readonly` / `gmail.metadata`. `openid email` lets us learn which
- * account a token belongs to.
+ * `gmail.modify` lets the extension preview unread mail and mark it read, archive it or report
+ * it as spam. It can't delete mail permanently. `openid email` tell your accounts apart.
  */
-export const SCOPES = ["openid", "email", "https://www.googleapis.com/auth/gmail.labels"];
+export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.modify";
+export const SCOPES = ["openid", "email", GMAIL_SCOPE];
 
 /**
- * Label whose unread conversations are counted.
- * "INBOX" counts every inbox tab; use "CATEGORY_PERSONAL" for Primary only.
+ * Label whose unread conversations are counted and previewed.
+ * "INBOX" covers every inbox tab; use "CATEGORY_PERSONAL" for Primary only.
  */
 export const COUNT_LABEL = "INBOX";
+
+/** How many unread conversations per account the popup previews. */
+export const MAX_PREVIEW_THREADS = 25;
 
 /** Polling interval. Chrome alarms can't fire more often than every 30s. */
 export const POLL_MINUTES = 1;

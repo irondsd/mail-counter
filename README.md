@@ -1,17 +1,26 @@
 # Mail Counter
 
-A Chrome extension that shows the unread count of several Gmail accounts in one toolbar badge.
+A Chrome extension that shows unread Gmail for several accounts in one toolbar badge, and lets you
+preview and handle new mail without opening Gmail.
 
 **Homepage:** <https://irondsd.github.io/mail-counter/> ·
 **Privacy policy:** <https://irondsd.github.io/mail-counter/privacy.html>
 
-It uses the official Gmail API with read-only label access (`gmail.labels`). It never touches
-cookies and never signs you in or out of Google. If it can't get a token silently, it marks the
-account "signed out" and waits for you to click **Reconnect**.
+It uses the official Gmail API (`gmail.modify`). It never touches cookies and never signs you in
+or out of Google. If it can't get a token silently, it marks the account and waits for you to
+click **Reconnect**.
 
 - **Badge:** total unread conversations in Inbox across accounts. Amber means an account needs
   attention; hover for details.
-- **Popup:** one row per account. Click a row to open that account's Gmail.
+- **Click with nothing unread:** opens Gmail (the first account).
+- **Click with unread mail:** opens the popup with a preview of each unread conversation. Hover
+  one for **Open**, **Mark as read**, **Archive** (also marks it read) and **Report spam**. Click
+  it to read the email inside the popup. With exactly one unread email, the popup opens straight
+  to it.
+- **Right-click the icon:** **Open** any account's inbox, or **Accounts…** to add, reconnect or
+  remove accounts.
+- **Email preview:** scripts, forms and remote images are blocked, so tracking pixels don't
+  report that you opened it. **Show images** loads them. Links open in a new tab.
 - **Polling:** every minute, plus whenever the popup opens.
 
 ## Development
@@ -29,7 +38,7 @@ bun run icons      # assets/icon.svg → public/icons/*.png
 
 | Path                  | What                                                              |
 | --------------------- | ----------------------------------------------------------------- |
-| `src/background.ts`   | service worker: OAuth, polling, badge                             |
+| `src/background.ts`   | service worker: OAuth, polling, badge, actions, click behavior    |
 | `src/popup/`          | popup UI                                                          |
 | `src/lib/`            | pure logic (OAuth URLs, Gmail API, badge), unit-tested in `test/` |
 | `src/lib/config.ts`   | scopes, which label to count, poll interval                       |
@@ -67,10 +76,12 @@ redirect URI in Google Cloud.
 4. **Add scopes.** Go to **Data Access → Add or remove scopes** and tick:
    - `openid`
    - `.../auth/userinfo.email`
-   - `.../auth/gmail.labels`. If it's not in the list, paste
-     `https://www.googleapis.com/auth/gmail.labels` into **Manually add scopes**.
+   - `.../auth/gmail.modify`. If it's not in the list, paste
+     `https://www.googleapis.com/auth/gmail.modify` into **Manually add scopes**.
 
-   Click **Update**, then **Save**.
+   Click **Update**, then **Save**. `gmail.modify` lets the extension read mail and change labels
+   (read, archive, spam). It can't delete mail permanently. Google classes it as **restricted**;
+   for personal use that only means the "unverified app" screen (see step 9).
 
 5. **Add yourself as a test user.** Go to **Audience → Test users → Add users** and add both
    Gmail addresses. Leave the app in **Testing**; that needs no domain or homepage. (Test users can
@@ -156,6 +167,5 @@ The `docs/` folder holds both pages, served by GitHub Pages.
 
 - **Count only the Primary tab:** set `COUNT_LABEL = "CATEGORY_PERSONAL"` in `src/lib/config.ts`.
 - **Change the icon color:** edit the `fill` in `assets/icon.svg`, then run `bun run icons`.
-- **"Label INBOX has no unread count" error:** `gmail.labels` turned out to be too narrow. Switch
-  the scope in `src/lib/config.ts` to `https://www.googleapis.com/auth/gmail.metadata`, add that
-  scope in Data Access, rebuild, and reconnect.
+- **Preview more conversations:** raise `MAX_PREVIEW_THREADS` (default 25 per account) in
+  `src/lib/config.ts`.

@@ -11,7 +11,7 @@
     <main>
       <p><a href="./">← Mail Counter</a></p>
       <h1>Privacy policy</h1>
-      <p class="muted">Effective 13 November 2026</p>
+      <p class="muted">Effective 13 November 2026 · updated for email previews and actions</p>
 
       <p>
         Mail Counter is a Chrome extension that shows how many unread conversations are in your
@@ -28,11 +28,22 @@
           make sure a token belongs to the right account.
         </li>
         <li>
-          <strong>The unread count of your Gmail Inbox</strong>, through the
-          <code>https://www.googleapis.com/auth/gmail.labels</code> scope. Mail Counter reads the
-          Inbox label's unread conversation count and nothing else. It never reads the content,
-          subject, sender or recipients of any email, and it never creates, changes or deletes
-          labels or messages.
+          <strong>Your Gmail</strong>, through the
+          <code>https://www.googleapis.com/auth/gmail.modify</code> scope. Mail Counter uses it to:
+          <ul>
+            <li>read how many unread conversations are in your Inbox;</li>
+            <li>
+              read the sender, subject, date and short snippet of up to 25 unread Inbox
+              conversations per account, to list them in the popup;
+            </li>
+            <li>read the body of one email when you open its preview;</li>
+            <li>
+              mark a conversation as read, archive it, or move it to spam, only when you click that
+              button.
+            </li>
+          </ul>
+          It never sends email, never deletes mail (the permission can't delete permanently), and
+          never reads conversations that are already read, other folders, or attachments.
         </li>
       </ul>
 
@@ -43,8 +54,15 @@
           storage on that device. They expire after about an hour and are replaced automatically.
         </li>
         <li>
-          <strong>Unread counts</strong> and the time of the last check are stored in the same local
-          storage so the popup can show them.
+          <strong>Unread counts and previews</strong> (sender, subject, date and snippet of unread
+          Inbox conversations) and the time of the last check are stored in the same local storage
+          so the popup opens instantly. A conversation's preview is removed as soon as it's no
+          longer unread.
+        </li>
+        <li>
+          <strong>Email bodies</strong> are fetched only when you open a preview and are kept in
+          memory while the popup is open. They are never written to storage. Remote images in an
+          email are blocked unless you click <em>Show images</em>.
         </li>
         <li>
           <strong>The list of connected email addresses</strong> is stored in Chrome's extension
@@ -57,9 +75,10 @@
       <p>
         Mail Counter has no server. The developer receives none of your data. The extension talks
         only to Google: <code>accounts.google.com</code> to get access tokens, and
-        <code>gmail.googleapis.com</code> and <code>openidconnect.googleapis.com</code> to read the
-        unread count and your email address. There is no analytics, advertising or tracking, and no
-        data is sold, transferred or shared with anyone.
+        <code>gmail.googleapis.com</code> and <code>openidconnect.googleapis.com</code> for your
+        mail and email address. The only other requests are images inside an email, and only after
+        you click <em>Show images</em>. There is no analytics, advertising or tracking, and no data
+        is sold, transferred or shared with anyone.
       </p>
 
       <h2>Google API Services User Data Policy</h2>

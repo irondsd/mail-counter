@@ -6,7 +6,7 @@
     <title>Mail Counter</title>
     <meta
       name="description"
-      content="A Chrome extension that shows the unread count of several Gmail accounts in one toolbar badge."
+      content="A Chrome extension that shows unread Gmail for several accounts in one toolbar badge, with quick previews and actions."
     />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="style.css" />
@@ -35,8 +35,8 @@
           you in or out.
         </li>
         <li>
-          <strong>Minimal access</strong>
-          It reads label unread counts only. It never sees your messages, subjects or senders.
+          <strong>Handle mail from the toolbar</strong>
+          Preview unread email, then open it, mark it read, archive it or report spam.
         </li>
       </ul>
 
@@ -44,13 +44,24 @@
       <p>
         Mail Counter is a small, open-source Chrome extension. Once a minute it asks the Gmail API
         how many unread conversations are in each connected account's Inbox, and it shows the total
-        on its toolbar icon. Click the icon to see the count for each account, and click an account
-        to open its Gmail.
+        on its toolbar icon.
+      </p>
+      <ul>
+        <li>Nothing unread: clicking the icon opens Gmail.</li>
+        <li>
+          Unread mail: clicking the icon shows a preview of each unread conversation, with buttons
+          to open it in Gmail, mark it as read, archive it or report it as spam. Click a preview to
+          read the email without leaving the page.
+        </li>
+        <li>Right-click the icon to open any account's inbox or manage your accounts.</li>
+      </ul>
+      <p>
+        Email previews are locked down: scripts, forms and remote images are blocked, so tracking
+        pixels can't tell the sender you looked. You can load images with one click.
       </p>
       <p>
-        If Google needs you to approve access again, the account is marked
-        <em>signed out</em> and you click <em>Reconnect</em>. Nothing happens to your Google
-        session.
+        If Google needs you to approve access again, the account is marked and you click
+        <em>Reconnect</em>. Nothing happens to your Google session.
       </p>
 
       <h2>What it can access</h2>
@@ -61,8 +72,10 @@
           your accounts apart.
         </li>
         <li>
-          <strong>Your Gmail labels</strong> (<code>gmail.labels</code>), to read the unread count
-          of your Inbox. Mail Counter only reads; it never creates, changes or deletes labels.
+          <strong>Your Gmail</strong> (<code>gmail.modify</code>), to read your unread Inbox
+          conversations for the preview, and to mark them read, archive them or move them to spam
+          when you click those buttons. Mail Counter never sends, deletes or changes mail on its
+          own, and this permission can't delete mail permanently.
         </li>
       </ul>
       <p>

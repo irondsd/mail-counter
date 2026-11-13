@@ -22,11 +22,11 @@ describe("buildAuthUrl", () => {
     expect(p.has("login_hint")).toBe(false);
   });
 
-  test("interactive with hint goes straight to that account", () => {
+  test("reconnect goes straight to that account and re-shows consent", () => {
     const p = new URL(buildAuthUrl({ ...base, interactive: true, loginHint: "a@gmail.com" }))
       .searchParams;
     expect(p.get("login_hint")).toBe("a@gmail.com");
-    expect(p.has("prompt")).toBe(false);
+    expect(p.get("prompt")).toBe("consent");
   });
 
   test("silent refresh uses prompt=none", () => {
@@ -47,6 +47,20 @@ describe("parseAuthRedirect", () => {
       now,
     );
     expect(result).toEqual({ ok: true, accessToken: "tok", expiresAt: now + 3_599_000 });
+  });
+
+  test("returns the scopes Google actually granted", () => {
+    const result = parseAuthRedirect(
+      "https://abc.chromiumapp.org/#state=s&access_token=tok&expires_in=3599&scope=email%20openid%20https://www.googleapis.com/auth/userinfo.email",
+      "s",
+      now,
+    );
+    expect(result).toEqual({
+      ok: true,
+      accessToken: "tok",
+      expiresAt: now + 3_599_000,
+      scopes: ["email", "openid", "https://www.googleapis.com/auth/userinfo.email"],
+    });
   });
 
   test("defaults expiry to an hour", () => {

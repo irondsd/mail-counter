@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { AuthError, fetchEmail, fetchUnreadCount, gmailUrl } from "../src/lib/gmail.ts";
+import {
+  AuthError,
+  fetchEmail,
+  fetchUnreadCount,
+  gmailUrl,
+  PermissionError,
+} from "../src/lib/gmail.ts";
 
 function fakeFetch(
   status: number,
@@ -38,12 +44,41 @@ describe("fetchUnreadCount", () => {
     );
   });
 
-  test("other errors carry Google's message", async () => {
+  test("missing Gmail scope tells you to reconnect", async () => {
+    // Real response from Gmail for a token without Gmail access.
     const f = fakeFetch(403, {
-      error: { message: "Request had insufficient authentication scopes." },
+      error: {
+        code: 403,
+        message: "Request had insufficient authentication scopes.",
+        status: "PERMISSION_DENIED",
+        details: [
+          {
+            "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+            reason: "ACCESS_TOKEN_SCOPE_INSUFFICIENT",
+            domain: "googleapis.com",
+          },
+        ],
+      },
     });
+    const error = await fetchUnreadCount("tok", "INBOX", f).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(PermissionError);
+    expect((error as Error).message).toContain("Reconnect");
+  });
+
+  test("disabled Gmail API says how to enable it", async () => {
+    const f = fakeFetch(403, {
+      error: {
+        message: "Gmail API has not been used in project 123 before or it is disabled.",
+        details: [{ reason: "SERVICE_DISABLED" }],
+      },
+    });
+    await expect(fetchUnreadCount("tok", "INBOX", f)).rejects.toThrow("Enable it");
+  });
+
+  test("other errors carry Google's message", async () => {
+    const f = fakeFetch(403, { error: { message: "Daily limit exceeded." } });
     await expect(fetchUnreadCount("tok", "INBOX", f)).rejects.toThrow(
-      "HTTP 403: Request had insufficient authentication scopes.",
+      "HTTP 403: Daily limit exceeded.",
     );
   });
 

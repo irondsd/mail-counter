@@ -17,5 +17,5 @@
       />
     </mask>
   </defs>
-  <rect x="6" y="20" width="116" height="88" rx="18" fill="#2563eb" mask="url(#flap-cut)" />
+  <rect x="6" y="20" width="116" height="88" rx="18" fill="#3B5BD4" mask="url(#flap-cut)" />
 </svg>

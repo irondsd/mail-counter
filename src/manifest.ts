@@ -27,6 +27,6 @@ export function createManifest({ version, key }: ManifestInput) {
     background: { service_worker: "background.js", type: "module" },
     // No host permissions: Google's APIs allow CORS, and the OAuth popup
     // is handled by chrome.identity.
-    permissions: ["identity", "alarms", "storage"],
+    permissions: ["identity", "alarms", "storage", "contextMenus"],
   };
 }

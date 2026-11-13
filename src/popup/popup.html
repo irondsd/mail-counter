@@ -6,39 +6,98 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="i-refresh" viewBox="0 0 24 24">
+        <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></symbol>
+      <symbol id="i-open" viewBox="0 0 24 24">
+        <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+      </symbol>
+      <symbol id="i-read" viewBox="0 0 24 24">
+        <path d="M3 10l9-6 9 6v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM3 10l9 6 9-6" />
+      </symbol>
+      <symbol id="i-archive" viewBox="0 0 24 24">
+        <path d="M3 4h18v5H3zM5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4" />
+      </symbol>
+      <symbol id="i-spam" viewBox="0 0 24 24">
+        <path d="M8.5 3h7L21 8.5v7L15.5 21h-7L3 15.5v-7zM12 8v5M12 16.5v.01" />
+      </symbol>
+    </svg>
+
     <header>
       <h1>Mail Counter</h1>
       <button id="refresh" class="icon" type="button" title="Check now" aria-label="Check now">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" />
-        </svg>
+        <svg><use href="#i-refresh" /></svg>
       </button>
     </header>
 
     <p id="notice" class="notice" hidden></p>
-    <ul id="accounts"></ul>
-    <p id="empty" class="empty" hidden>No accounts yet.</p>
+
+    <section id="list-view">
+      <div id="accounts"></div>
+      <p id="empty" class="empty" hidden>No accounts yet.</p>
+    </section>
+
+    <section id="detail-view" hidden>
+      <div class="detail-bar">
+        <button id="back" class="icon" type="button" title="Back" aria-label="Back">
+          <svg><use href="#i-back" /></svg>
+        </button>
+        <div class="actions" id="detail-actions"></div>
+      </div>
+      <div class="detail-head">
+        <h2 id="detail-subject"></h2>
+        <div class="detail-meta">
+          <span id="detail-from" class="from"></span>
+          <span id="detail-date" class="date"></span>
+        </div>
+      </div>
+      <p id="detail-status" class="detail-status">Loading…</p>
+      <button id="show-images" class="link" type="button" hidden>Show images</button>
+      <iframe id="detail-frame" title="Email preview" hidden></iframe>
+    </section>
 
     <footer>
-      <button id="add" type="button">Add Gmail account</button>
+      <button id="add" class="link" type="button">Add Gmail account</button>
       <span id="checked" class="muted"></span>
     </footer>
 
-    <template id="row">
-      <li>
-        <button class="open" type="button">
-          <span class="email"></span>
-          <span class="count"></span>
+    <template id="account-tpl">
+      <section class="account">
+        <div class="account-head">
+          <button class="account-open" type="button">
+            <span class="email"></span>
+            <span class="count"></span>
+          </button>
+          <button class="reconnect link" type="button" hidden>Reconnect</button>
+          <button
+            class="remove icon"
+            type="button"
+            title="Remove account"
+            aria-label="Remove account"
+          >
+            <svg><use href="#i-close" /></svg>
+          </button>
+        </div>
+        <p class="account-error" hidden></p>
+        <ul class="threads"></ul>
+        <button class="more link" type="button" hidden></button>
+      </section>
+    </template>
+
+    <template id="thread-tpl">
+      <li class="thread">
+        <button class="thread-main" type="button">
+          <span class="line">
+            <span class="from"></span>
+            <span class="date"></span>
+          </span>
+          <span class="subject"></span>
+          <span class="snippet"></span>
         </button>
-        <button class="reconnect" type="button" hidden>Reconnect</button>
-        <button
-          class="remove icon"
-          type="button"
-          title="Remove account"
-          aria-label="Remove account"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-        </button>
+        <div class="actions"></div>
       </li>
     </template>
 

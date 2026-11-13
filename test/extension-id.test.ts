@@ -20,6 +20,6 @@ test("manifest pins the key and asks only for what it needs", () => {
   expect(manifest.manifest_version).toBe(3);
   expect(manifest.key).toBe(keyFile.key);
   expect(manifest.version).toBe("1.2.3");
-  expect(manifest.permissions).toEqual(["identity", "alarms", "storage"]);
+  expect(manifest.permissions).toEqual(["identity", "alarms", "storage", "contextMenus"]);
   expect("host_permissions" in manifest).toBe(false);
 });

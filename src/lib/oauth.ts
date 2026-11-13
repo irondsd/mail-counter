@@ -26,12 +26,15 @@ export function buildAuthUrl(options: AuthUrlOptions): string {
     params.set("prompt", "none");
   } else if (!options.loginHint) {
     params.set("prompt", "select_account");
+  } else {
+    params.set("prompt", "consent");
   }
   return url.toString();
 }
 
 export type AuthResult =
-  { ok: true; accessToken: string; expiresAt: number } | { ok: false; error: string };
+  | { ok: true; accessToken: string; expiresAt: number; scopes?: string[] }
+  | { ok: false; error: string };
 
 /**
  * Parses the URL Google redirects back to. Implicit-flow results live in the
@@ -58,7 +61,13 @@ export function parseAuthRedirect(
 
   const expiresIn = Number(get("expires_in") ?? "3600");
   const seconds = Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 3600;
-  return { ok: true, accessToken, expiresAt: now + seconds * 1000 };
+  const scope = get("scope");
+  return {
+    ok: true,
+    accessToken,
+    expiresAt: now + seconds * 1000,
+    ...(scope ? { scopes: scope.split(" ").filter(Boolean) } : {}),
+  };
 }
 
 /** Errors that mean "the user has to click something", not "it's broken". */

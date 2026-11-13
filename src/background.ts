@@ -1,16 +1,32 @@
 import { computeBadge } from "./lib/badge.ts";
 import {
   COUNT_LABEL,
+  GMAIL_SCOPE,
   GOOGLE_CLIENT_ID,
+  MAX_PREVIEW_THREADS,
   POLL_MINUTES,
   SCOPES,
   TOKEN_EXPIRY_MARGIN_MS,
 } from "./lib/config.ts";
-import { AuthError, fetchEmail, fetchUnreadCount, gmailUrl } from "./lib/gmail.ts";
+import {
+  AuthError,
+  fetchEmail,
+  fetchMessageBody,
+  fetchThreadSummary,
+  fetchUnreadCount,
+  gmailUrl,
+  listUnreadThreads,
+  MISSING_GMAIL_ACCESS,
+  modifyThread,
+  PermissionError,
+} from "./lib/gmail.ts";
 import { buildAuthUrl, needsInteraction, parseAuthRedirect } from "./lib/oauth.ts";
-import type { AccountState, Message, Reply, Token } from "./lib/types.ts";
+import { inboxToOpenDirectly, mergeThreads, removeThread, threadsToFetch } from "./lib/state.ts";
+import type { AccountState, Message, Reply, ThreadSummary, Token } from "./lib/types.ts";
 
 const ALARM = "poll";
+const MENU_ACCOUNTS = "accounts";
+const MENU_OPEN_PREFIX = "open:";
 
 /** Silent sign-in isn't possible; the user has to click "Reconnect". */
 class InteractionRequired extends Error {
@@ -57,7 +73,7 @@ async function getStates(): Promise<AccountState[]> {
 
 async function setStates(states: AccountState[]): Promise<void> {
   await chrome.storage.local.set({ accounts: states });
-  await updateBadge(states);
+  await Promise.all([updateBadge(states), updateActionMode(states), updateMenu(states)]);
 }
 
 async function updateBadge(states: AccountState[]): Promise<void> {
@@ -68,6 +84,51 @@ async function updateBadge(states: AccountState[]): Promise<void> {
     chrome.action.setBadgeTextColor({ color: "#ffffff" }),
     chrome.action.setTitle({ title: badge.title }),
   ]);
+}
+
+/**
+ * Nothing unread → no popup, so a click fires action.onClicked and opens Gmail.
+ * Unread mail or a problem → the popup.
+ */
+async function updateActionMode(states: AccountState[]): Promise<void> {
+  await chrome.action.setPopup({ popup: inboxToOpenDirectly(states) ? "" : "popup.html" });
+}
+
+let menuKey = "";
+
+/** Right-click menu on the toolbar icon: open any inbox, or manage accounts. */
+async function updateMenu(states: AccountState[]): Promise<void> {
+  const key = states.map((s) => s.email).join("\n");
+  if (key === menuKey) return;
+  menuKey = key;
+  await chrome.contextMenus.removeAll();
+  for (const s of states) {
+    chrome.contextMenus.create({
+      id: `${MENU_OPEN_PREFIX}${s.email}`,
+      title: `Open ${s.email}`,
+      contexts: ["action"],
+    });
+  }
+  chrome.contextMenus.create({
+    id: MENU_ACCOUNTS,
+    title: "Accounts…",
+    contexts: ["action"],
+  });
+}
+
+/** Shows the popup even when a click would normally open Gmail. */
+async function showPopup(): Promise<void> {
+  await chrome.action.setPopup({ popup: "popup.html" });
+  try {
+    await chrome.action.openPopup();
+  } catch {
+    await chrome.windows.create({
+      url: chrome.runtime.getURL("popup.html"),
+      type: "popup",
+      width: 420,
+      height: 600,
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +170,14 @@ async function authorize(interactive: boolean, loginHint?: string): Promise<Toke
     if (needsInteraction(result.error)) throw new InteractionRequired(result.error);
     throw new Error(`Google sign-in failed: ${result.error}`);
   }
-  return { accessToken: result.accessToken, expiresAt: result.expiresAt };
+  return { accessToken: result.accessToken, expiresAt: result.expiresAt, scopes: result.scopes };
+}
+
+/** Google can hand back a token without Gmail access if its checkbox was left unticked. */
+function assertGmailScope(token: Token): void {
+  if (token.scopes && !token.scopes.includes(GMAIL_SCOPE)) {
+    throw new PermissionError(MISSING_GMAIL_ACCESS);
+  }
 }
 
 /** Gets a fresh token for `email` without any UI, and checks it's for the right account. */
@@ -129,6 +197,20 @@ async function validToken(email: string): Promise<Token> {
   return silentToken(email);
 }
 
+/** Runs `fn` with a valid token, renewing it once if Google rejects it. */
+async function withToken<T>(email: string, fn: (accessToken: string) => Promise<T>): Promise<T> {
+  let token = await validToken(email);
+  assertGmailScope(token);
+  try {
+    return await fn(token.accessToken);
+  } catch (e) {
+    if (!(e instanceof AuthError)) throw e;
+    token = await silentToken(email);
+    assertGmailScope(token);
+    return fn(token.accessToken);
+  }
+}
+
 /** Interactive sign-in. Without a hint, Google shows the account chooser. */
 async function connect(loginHint?: string): Promise<void> {
   const token = await authorize(true, loginHint);
@@ -143,32 +225,51 @@ async function connect(loginHint?: string): Promise<void> {
 // Polling
 // ---------------------------------------------------------------------------
 
+async function loadThreads(
+  accessToken: string,
+  previous: ThreadSummary[] | undefined,
+): Promise<ThreadSummary[]> {
+  const listed = await listUnreadThreads(accessToken, COUNT_LABEL, MAX_PREVIEW_THREADS);
+  const results = await Promise.allSettled(
+    threadsToFetch(listed, previous).map((id) => fetchThreadSummary(accessToken, id)),
+  );
+  const fetched = results.flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []));
+  return mergeThreads(listed, previous, fetched);
+}
+
 async function checkAccount(
   email: string,
   previous: AccountState | undefined,
 ): Promise<AccountState> {
   const checkedAt = Date.now();
   try {
-    let token = await validToken(email);
-    let unread: number;
-    try {
-      unread = await fetchUnreadCount(token.accessToken, COUNT_LABEL);
-    } catch (e) {
-      if (!(e instanceof AuthError)) throw e;
-      token = await silentToken(email);
-      unread = await fetchUnreadCount(token.accessToken, COUNT_LABEL);
-    }
-    return { email, status: "ok", unread, checkedAt };
+    const { unread, threads } = await withToken(email, async (accessToken) => {
+      const unread = await fetchUnreadCount(accessToken, COUNT_LABEL);
+      const threads = unread > 0 ? await loadThreads(accessToken, previous?.threads) : [];
+      return { unread, threads };
+    });
+    return { email, status: "ok", unread, threads, checkedAt };
   } catch (e) {
-    if (e instanceof InteractionRequired || e instanceof AuthError) {
+    if (e instanceof PermissionError) {
       await setToken(email, undefined);
       return { email, status: "needs-auth", unread: null, error: e.message, checkedAt };
     }
-    // Network trouble etc.: keep the last known count.
+    if (e instanceof InteractionRequired || e instanceof AuthError) {
+      await setToken(email, undefined);
+      return {
+        email,
+        status: "needs-auth",
+        unread: null,
+        error: "Google needs you to sign in again. Click Reconnect.",
+        checkedAt,
+      };
+    }
+    // Network trouble etc.: keep the last known state.
     return {
       email,
       status: "error",
       unread: previous?.unread ?? null,
+      ...(previous?.threads ? { threads: previous.threads } : {}),
       error: errorMessage(e),
       checkedAt,
     };
@@ -221,7 +322,11 @@ async function ensureAlarm(): Promise<void> {
   }
 }
 
-async function handle(message: Message): Promise<void> {
+async function openTab(url: string): Promise<void> {
+  await chrome.tabs.create({ url });
+}
+
+async function handle(message: Message): Promise<unknown> {
   switch (message.type) {
     case "add-account":
       return connect();
@@ -232,8 +337,18 @@ async function handle(message: Message): Promise<void> {
     case "refresh":
       return refreshAll();
     case "open":
-      await chrome.tabs.create({ url: gmailUrl(message.email) });
+      return openTab(gmailUrl(message.email));
+    case "open-thread":
+      return openTab(gmailUrl(message.email, message.threadId));
+    case "thread-action": {
+      const { email, threadId, action } = message;
+      await withToken(email, (t) => modifyThread(t, threadId, action));
+      await setStates(removeThread(await getStates(), email, threadId));
+      void refreshAll();
       return;
+    }
+    case "get-body":
+      return withToken(message.email, (t) => fetchMessageBody(t, message.messageId));
   }
 }
 
@@ -242,7 +357,8 @@ async function handle(message: Message): Promise<void> {
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onInstalled.addListener(() => {
-  void ensureAlarm().then(refreshAll);
+  menuKey = "\0"; // force a rebuild
+  void ensureAlarm().then(getStates).then(updateMenu).then(refreshAll);
 });
 
 chrome.runtime.onStartup.addListener(() => {
@@ -253,10 +369,32 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) void refreshAll();
 });
 
+// Fires only when no popup is set, i.e. nothing is unread.
+chrome.action.onClicked.addListener(() => {
+  void getStates().then((states) => {
+    const email = inboxToOpenDirectly(states);
+    return email ? openTab(gmailUrl(email)) : showPopup();
+  });
+});
+
+chrome.contextMenus.onClicked.addListener((info) => {
+  const id = String(info.menuItemId);
+  if (id === MENU_ACCOUNTS) void showPopup();
+  else if (id.startsWith(MENU_OPEN_PREFIX))
+    void openTab(gmailUrl(id.slice(MENU_OPEN_PREFIX.length)));
+});
+
 chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
   handle(message).then(
-    () => sendResponse({ ok: true } satisfies Reply),
-    (e: unknown) => sendResponse({ ok: false, error: errorMessage(e) } satisfies Reply),
+    (data) => sendResponse({ ok: true, data } satisfies Reply),
+    (e: unknown) =>
+      sendResponse({
+        ok: false,
+        error:
+          e instanceof InteractionRequired || e instanceof AuthError
+            ? "Google needs you to sign in again. Click Reconnect."
+            : errorMessage(e),
+      } satisfies Reply),
   );
   return true; // reply asynchronously
 });
