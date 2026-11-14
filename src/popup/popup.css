@@ -11,12 +11,40 @@ header {
   border-bottom: 1px solid var(--line);
 }
 
-header .brand {
-  margin-right: auto;
-}
-
 #checked {
   margin-right: 6px;
+  margin-left: auto;
+}
+
+/* Counts drawn as a filled red pill: the header total and an account with unread mail. */
+.pill {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--unread);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+#total {
+  margin-left: 4px;
+}
+
+/* A round initial standing in for an account or a sender. */
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--hover);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .empty {
@@ -30,6 +58,31 @@ header .brand {
 
 .empty p {
   margin: 0 0 8px;
+}
+
+.caught-up {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 18px 16px 20px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.glyph {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.caught-up .glyph {
+  color: var(--ok);
 }
 
 /* ---- accounts ----------------------------------------------------------- */
@@ -54,8 +107,11 @@ header .brand {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 10px 6px 6px;
+  padding: 4px 8px 4px 4px;
   background: var(--bg);
+}
+
+.account:has(.thread) .account-head {
   border-bottom: 1px solid var(--line);
 }
 
@@ -63,14 +119,19 @@ header .brand {
   flex: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
-  padding: 6px 10px;
+  padding: 6px 8px 6px 12px;
   text-align: left;
 }
 
+.account-open.has-unread .avatar {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
 .account-open .email {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -78,13 +139,18 @@ header .brand {
 }
 
 .account-open .count {
+  min-width: 24px;
+  text-align: center;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--muted);
 }
 
-.account-open .count.has-unread {
-  color: var(--unread);
+.account-open .count.pill {
+  min-width: 0;
+  color: var(--bg);
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
 .account-error {
@@ -121,11 +187,16 @@ header .brand {
   text-align: left;
 }
 
+.thread .sender {
+  display: none;
+}
+
 .thread .line {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
+  min-width: 0;
 }
 
 .thread .from {
@@ -179,26 +250,47 @@ header .brand {
   background: var(--hover);
 }
 
-.thread:hover > .actions,
-.thread:focus-within > .actions,
-.thread.expanded > .actions {
+.thread:not(.expanded):hover > .actions,
+.thread:not(.expanded):focus-within > .actions {
   display: flex;
 }
 
-.thread:hover .date,
-.thread.expanded .date {
+.thread:not(.expanded):hover .date {
   visibility: hidden;
 }
 
-/* ---- expanded card: the whole email ------------------------------------ */
+/* ---- expanded card: the whole email, inset with a labelled toolbar ----- */
 
-.thread.expanded {
+.thread.expanded,
+.thread.expanded:hover,
+.thread.expanded:focus-within {
+  margin: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
   background: var(--panel);
+  overflow: hidden;
 }
 
-/* The open card's header keeps one shade, hovered or not, so the buttons blend in. */
 .thread.expanded .thread-main {
-  background: var(--hover);
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 2px 12px;
+  align-items: center;
+  padding: 12px 14px 8px;
+}
+
+.thread.expanded .thread-main:not(:hover) {
+  background: none;
+}
+
+.thread.expanded .sender {
+  display: grid;
+  grid-row: span 2;
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--line);
 }
 
 .thread.expanded .subject {
@@ -218,8 +310,33 @@ header .brand {
   color: var(--muted);
 }
 
+.toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 0 8px 8px 50px;
+}
+
+.toolbar button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.toolbar button:hover {
+  color: var(--fg);
+}
+
+/* Open in Gmail closes the popup, so it stands apart on the right. */
+.toolbar button:last-child {
+  margin-left: auto;
+}
+
 .thread-body {
-  padding: 0 12px 12px;
+  padding: 0 10px 10px;
 }
 
 .body-status {
@@ -228,7 +345,8 @@ header .brand {
 }
 
 .show-images {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
+  font-size: 13px;
   font-weight: 500;
 }
 

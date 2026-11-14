@@ -24,6 +24,44 @@
       </section>
 
       <section class="card">
+        <h2>Toolbar icon</h2>
+        <p class="hint">When nothing is unread, clicking the icon:</p>
+        <div
+          class="choices"
+          role="radiogroup"
+          aria-label="When nothing is unread, clicking the icon"
+        >
+          <label class="check">
+            <input type="radio" name="empty-click" value="gmail" />
+            Opens Gmail
+          </label>
+          <label class="check">
+            <input type="radio" name="empty-click" value="popup" />
+            Shows the popup
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Appearance</h2>
+        <p class="hint">Theme for the popup and this page.</p>
+        <div class="segmented" role="radiogroup" aria-label="Theme">
+          <label>
+            <input type="radio" name="theme" value="system" />
+            <span>System</span>
+          </label>
+          <label>
+            <input type="radio" name="theme" value="light" />
+            <span>Light</span>
+          </label>
+          <label>
+            <input type="radio" name="theme" value="dark" />
+            <span>Dark</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>Sound</h2>
         <label class="check">
           <input id="sound" type="checkbox" />

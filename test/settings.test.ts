@@ -18,7 +18,26 @@ describe("normalizeSettings", () => {
         volume: 3,
         checkEvery: { "a@x.com": 30, "b@x.com": 0, "c@x.com": "10", "d@x.com": Number.NaN },
       }),
-    ).toEqual({ sound: false, volume: 1, checkEvery: { "a@x.com": 30 } });
+    ).toEqual({
+      sound: false,
+      volume: 1,
+      checkEvery: { "a@x.com": 30 },
+      emptyClick: "gmail",
+      theme: "system",
+    });
+  });
+
+  test("empty-inbox click opens Gmail unless set to the popup", () => {
+    expect(normalizeSettings({ emptyClick: "popup" }).emptyClick).toBe("popup");
+    expect(normalizeSettings({ emptyClick: "gmail" }).emptyClick).toBe("gmail");
+    expect(normalizeSettings({ emptyClick: "tab" }).emptyClick).toBe("gmail");
+  });
+
+  test("theme follows the system unless set to light or dark", () => {
+    expect(normalizeSettings({ theme: "dark" }).theme).toBe("dark");
+    expect(normalizeSettings({ theme: "light" }).theme).toBe("light");
+    expect(normalizeSettings({ theme: "sepia" }).theme).toBe("system");
+    expect(normalizeSettings({}).theme).toBe("system");
   });
 
   test("intervals are kept between 10 seconds and 10 minutes", () => {

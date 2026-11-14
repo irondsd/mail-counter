@@ -13,11 +13,12 @@
   --ok: #1e8e3e;
   --warn: #b45309;
   --warn-bg: #fef3c7;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
+/* "System" (no data-theme) follows the browser; the options page can force light or dark. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #1f1f1f;
     --fg: #ececec;
     --muted: #9a9a9a;
@@ -30,7 +31,24 @@
     --ok: #6dd58c;
     --warn: #fbbf24;
     --warn-bg: #3a2f12;
+    color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1f1f1f;
+  --fg: #ececec;
+  --muted: #9a9a9a;
+  --line: #333333;
+  --hover: #2a2a2a;
+  --panel: #252525;
+  --accent: #8ea4ff;
+  --accent-fg: #10142a;
+  --unread: #ff7a6e;
+  --ok: #6dd58c;
+  --warn: #fbbf24;
+  --warn-bg: #3a2f12;
+  color-scheme: dark;
 }
 
 * {

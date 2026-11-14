@@ -1,6 +1,7 @@
 import { formatCount } from "../lib/badge.ts";
-import { buildPreviewDocument, formatDate, hasRemoteImages } from "../lib/preview.ts";
+import { buildPreviewDocument, formatDate, hasRemoteImages, initial } from "../lib/preview.ts";
 import { removeThread } from "../lib/state.ts";
+import { initTheme } from "../lib/theme.ts";
 import type {
   AccountState,
   Message,
@@ -10,12 +11,16 @@ import type {
   ThreadSummary,
 } from "../lib/types.ts";
 
+initTheme();
+
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const accountsEl = $("accounts");
 const empty = $("empty");
 const notice = $("notice");
 const checked = $("checked");
+const total = $("total");
+const caughtUp = $("caught-up");
 const refreshButton = $<HTMLButtonElement>("refresh");
 const accountTpl = $<HTMLTemplateElement>("account-tpl");
 const threadTpl = $<HTMLTemplateElement>("thread-tpl");
@@ -33,11 +38,12 @@ let expanded: {
   images: boolean;
 } | null = null;
 
-const ACTIONS: { action: ThreadAction | "open"; icon: string; label: string }[] = [
-  { action: "read", icon: "i-read", label: "Mark as read" },
-  { action: "archive", icon: "i-archive", label: "Archive" },
-  { action: "spam", icon: "i-spam", label: "Report spam" },
-  { action: "open", icon: "i-open", label: "Open in Gmail" },
+/** `short` labels the open card's toolbar; `label` is the tooltip and accessible name. */
+const ACTIONS: { action: ThreadAction | "open"; icon: string; label: string; short: string }[] = [
+  { action: "read", icon: "i-read", label: "Mark as read", short: "Mark read" },
+  { action: "archive", icon: "i-archive", label: "Archive", short: "Archive" },
+  { action: "spam", icon: "i-spam", label: "Report spam", short: "Spam" },
+  { action: "open", icon: "i-open", label: "Open in Gmail", short: "Open in Gmail" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -64,14 +70,24 @@ function openOptions(): void {
   window.close();
 }
 
-function actionButtons(email: string, thread: ThreadSummary): HTMLButtonElement[] {
-  return ACTIONS.map(({ action, icon, label }) => {
+/** Icon-only buttons for a card's hover row, or labelled ones for the open card's toolbar. */
+function actionButtons(
+  email: string,
+  thread: ThreadSummary,
+  labelled = false,
+): HTMLButtonElement[] {
+  return ACTIONS.map(({ action, icon, label, short }) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "icon";
     button.title = label;
-    button.setAttribute("aria-label", label);
-    button.innerHTML = `<svg><use href="#${icon}" /></svg>`;
+    if (labelled) {
+      button.innerHTML = `<svg class="glyph" aria-hidden="true"><use href="#${icon}" /></svg>`;
+      button.append(short);
+    } else {
+      button.className = "icon";
+      button.setAttribute("aria-label", label);
+      button.innerHTML = `<svg><use href="#${icon}" /></svg>`;
+    }
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       if (action === "open") void openThread(email, thread);
@@ -117,6 +133,7 @@ function renderThread(email: string, thread: ThreadSummary): HTMLLIElement {
   const from = el<HTMLElement>(li, ".from");
   from.textContent = thread.count > 1 ? `${thread.fromName} (${thread.count})` : thread.fromName;
   from.title = thread.fromEmail;
+  el(li, ".sender").textContent = initial(thread.fromName || thread.fromEmail);
   el(li, ".date").textContent = formatDate(thread.date);
   el(li, ".subject").textContent = thread.subject;
   el(li, ".snippet").textContent = thread.snippet;
@@ -135,6 +152,9 @@ function renderThread(email: string, thread: ThreadSummary): HTMLLIElement {
   if (isExpanded(email, thread)) {
     li.classList.add("expanded");
     main.setAttribute("aria-expanded", "true");
+    const toolbar = el<HTMLElement>(li, ".toolbar");
+    toolbar.append(...actionButtons(email, thread, true));
+    toolbar.hidden = false;
     renderBody(li);
   }
   return li;
@@ -149,6 +169,7 @@ function renderAccount(account: AccountState): HTMLElement {
   const more = el<HTMLButtonElement>(section, ".more");
 
   el(section, ".email").textContent = account.email;
+  el(section, ".avatar").textContent = initial(account.email);
   open.title = `Open Gmail for ${account.email}`;
   open.addEventListener("click", () => {
     void send({ type: "open", email: account.email }).then(() => window.close());
@@ -157,7 +178,8 @@ function renderAccount(account: AccountState): HTMLElement {
   const unread = account.unread ?? 0;
   if (account.status === "ok") {
     count.textContent = formatCount(unread);
-    count.classList.toggle("has-unread", unread > 0);
+    count.classList.toggle("pill", unread > 0);
+    open.classList.toggle("has-unread", unread > 0);
   } else if (account.unread !== null) {
     count.textContent = formatCount(unread);
   }
@@ -199,6 +221,11 @@ function render(): void {
   accountsEl.replaceChildren(...accounts.map(renderAccount));
   accountsEl.scrollTop = scroll;
   empty.hidden = accounts.length > 0;
+  const unread = accounts.reduce((n, a) => n + (a.unread ?? 0), 0);
+  total.hidden = unread === 0;
+  total.textContent = formatCount(unread);
+  total.title = `${unread} unread`;
+  caughtUp.hidden = accounts.length === 0 || unread > 0 || !allOk();
   const last = Math.max(0, ...accounts.map((a) => a.checkedAt ?? 0));
   checked.textContent = last ? `Checked ${formatDate(last)}` : "";
 }
@@ -223,13 +250,15 @@ function fitFrame(frame: HTMLIFrameElement): void {
     const head = card?.closest(".account")?.querySelector<HTMLElement>(".account-head");
     if (!card) return;
     const above = frame.getBoundingClientRect().top - card.getBoundingClientRect().top;
-    const room = accountsEl.clientHeight - (head?.offsetHeight ?? 0) - above - 14;
+    // Below the frame: the body's padding and the card's border and margin.
+    const room = accountsEl.clientHeight - (head?.offsetHeight ?? 0) - above - 24;
     const height = doc.documentElement.scrollHeight + 2;
     frame.style.height = `${Math.max(FRAME_MIN, Math.min(height, room))}px`;
     accountsEl.scrollTop +=
       card.getBoundingClientRect().top -
       accountsEl.getBoundingClientRect().top -
-      (head?.offsetHeight ?? 0);
+      (head?.offsetHeight ?? 0) -
+      12; // the card's top margin stays visible
   });
 }
 

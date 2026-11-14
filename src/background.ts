@@ -20,6 +20,7 @@ import {
   modifyThread,
   PermissionError,
 } from "./lib/gmail.ts";
+import { MENU_OPEN_PREFIX, MENU_POPUP, MENU_REFRESH, menuItems } from "./lib/menu.ts";
 import { buildAuthUrl, needsInteraction, parseAuthRedirect } from "./lib/oauth.ts";
 import { intervalFor, normalizeSettings, type Settings } from "./lib/settings.ts";
 import {
@@ -41,7 +42,6 @@ import type {
 } from "./lib/types.ts";
 
 const ALARM = "poll";
-const MENU_OPEN_PREFIX = "open:";
 
 /** Silent sign-in isn't possible; the user has to click "Reconnect". */
 class InteractionRequired extends Error {
@@ -94,7 +94,11 @@ async function getStates(): Promise<AccountState[]> {
 
 async function setStates(states: AccountState[]): Promise<void> {
   await chrome.storage.local.set({ accounts: states });
-  await Promise.all([updateBadge(states), updateActionMode(states), updateMenu(states)]);
+  await Promise.all([
+    updateBadge(states),
+    updateActionMode(states, await getSettings()),
+    updateMenu(states),
+  ]);
 }
 
 async function updateBadge(states: AccountState[]): Promise<void> {
@@ -108,27 +112,44 @@ async function updateBadge(states: AccountState[]): Promise<void> {
 }
 
 /**
- * Nothing unread → no popup, so a click fires action.onClicked and opens Gmail.
- * Unread mail or a problem → the popup.
+ * Nothing unread → no popup (unless the options say to keep it), so a click fires
+ * action.onClicked and opens Gmail. Unread mail or a problem → the popup.
  */
-async function updateActionMode(states: AccountState[]): Promise<void> {
-  await chrome.action.setPopup({ popup: inboxToOpenDirectly(states) ? "" : "popup.html" });
+async function updateActionMode(states: AccountState[], settings: Settings): Promise<void> {
+  const direct = settings.emptyClick === "gmail" && inboxToOpenDirectly(states);
+  await chrome.action.setPopup({ popup: direct ? "" : "popup.html" });
 }
 
-let menuKey = "";
+let menuKey: string | null = null;
 
-/** Right-click menu on the toolbar icon: open any inbox. Chrome adds "Options" itself. */
+/**
+ * Right-click menu on the toolbar icon: open any inbox, check all accounts now, or open the
+ * popup. Chrome adds "Options" itself.
+ */
 async function updateMenu(states: AccountState[]): Promise<void> {
   const key = states.map((s) => s.email).join("\n");
   if (key === menuKey) return;
   menuKey = key;
   await chrome.contextMenus.removeAll();
-  for (const s of states) {
-    chrome.contextMenus.create({
-      id: `${MENU_OPEN_PREFIX}${s.email}`,
-      title: `Open ${s.email}`,
-      contexts: ["action"],
-    });
+  for (const item of menuItems(states.map((s) => s.email))) {
+    chrome.contextMenus.create({ ...item, contexts: ["action"] });
+  }
+}
+
+/**
+ * Opens the popup from the menu. With nothing unread the icon may have no popup (a click opens
+ * Gmail instead), so set it first; both calls go out together and Chrome runs them in order.
+ * The usual click behaviour comes back once the popup is open.
+ */
+async function openPopup(windowId?: number): Promise<void> {
+  void chrome.action.setPopup({ popup: "popup.html" });
+  try {
+    await chrome.action.openPopup(windowId === undefined ? undefined : { windowId });
+  } catch (e) {
+    console.warn("Couldn't open the popup:", e);
+  } finally {
+    const [states, settings] = await Promise.all([getStates(), getSettings()]);
+    await updateActionMode(states, settings);
   }
 }
 
@@ -436,7 +457,7 @@ async function handle(message: Message): Promise<unknown> {
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onInstalled.addListener(() => {
-  menuKey = "\0"; // force a rebuild
+  menuKey = null; // force a rebuild
   void ensureAlarm()
     .then(getStates)
     .then(updateMenu)
@@ -451,7 +472,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) void refreshAll(false);
 });
 
-// Fires only when no popup is set, i.e. nothing is unread.
+// Fires only when no popup is set: nothing is unread and the options say to open Gmail.
 chrome.action.onClicked.addListener(() => {
   void getStates().then((states) => {
     const email = inboxToOpenDirectly(states);
@@ -459,9 +480,12 @@ chrome.action.onClicked.addListener(() => {
   });
 });
 
-chrome.contextMenus.onClicked.addListener((info) => {
+chrome.contextMenus.onClicked.addListener((info, tab) => {
   const id = String(info.menuItemId);
-  if (id.startsWith(MENU_OPEN_PREFIX)) void openTab(gmailUrl(id.slice(MENU_OPEN_PREFIX.length)));
+  if (id === MENU_REFRESH) void refreshAll();
+  else if (id === MENU_POPUP) void openPopup(tab?.windowId);
+  else if (id.startsWith(MENU_OPEN_PREFIX))
+    void openTab(gmailUrl(id.slice(MENU_OPEN_PREFIX.length)));
 });
 
 chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
@@ -484,5 +508,10 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "sync" && changes.emails) void refreshAll();
   // A new interval applies right away, not after the current wait.
-  if (area === "sync" && changes.settings) void scheduleNext();
+  if (area === "sync" && changes.settings) {
+    void scheduleNext();
+    void Promise.all([getStates(), getSettings()]).then(([states, settings]) =>
+      updateActionMode(states, settings),
+    );
+  }
 });

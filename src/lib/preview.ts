@@ -56,6 +56,12 @@ export function buildPreviewDocument(body: MessageBody, allowRemoteImages: boole
   return `<!doctype html><html><head>${head}</head><body>${content}</body></html>`;
 }
 
+/** The first letter or digit of a name or address, upper-cased, for an avatar. */
+export function initial(text: string): string {
+  const match = /[\p{L}\p{N}]/u.exec(text);
+  return match ? match[0].toLocaleUpperCase() : "?";
+}
+
 /** "14:05" today, "13 Nov" this year, "13/11/2025" before that. */
 export function formatDate(ms: number, now: Date = new Date()): string {
   if (!ms) return "";

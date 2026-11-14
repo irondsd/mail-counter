@@ -28,10 +28,15 @@
       <symbol id="i-spam" viewBox="0 0 24 24">
         <path d="M8.5 3h7L21 8.5v7L15.5 21h-7L3 15.5v-7zM12 8v5M12 16.5v.01" />
       </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M8 12.5l2.8 2.8L16 10" />
+      </symbol>
     </svg>
 
     <header>
       <h1 class="brand"><img src="icons/icon-48.png" alt="" />Mail Counter</h1>
+      <span id="total" class="pill" hidden></span>
       <span id="checked" class="muted"></span>
       <button id="options" class="icon" type="button" title="Options" aria-label="Options">
         <svg><use href="#i-settings" /></svg>
@@ -44,6 +49,9 @@
     <p id="notice" class="notice" hidden></p>
 
     <main id="accounts"></main>
+    <p id="caught-up" class="caught-up" hidden>
+      <svg class="glyph" aria-hidden="true"><use href="#i-check" /></svg>All caught up
+    </p>
     <div id="empty" class="empty" hidden>
       <p>No Gmail accounts yet.</p>
       <button id="open-options" class="primary" type="button">Add an account in Options</button>
@@ -53,6 +61,7 @@
       <section class="account">
         <div class="account-head">
           <button class="account-open" type="button">
+            <span class="avatar" aria-hidden="true"></span>
             <span class="email"></span>
             <span class="count"></span>
           </button>
@@ -67,6 +76,7 @@
     <template id="thread-tpl">
       <li class="thread">
         <button class="thread-main" type="button" aria-expanded="false">
+          <span class="avatar sender" aria-hidden="true"></span>
           <span class="line">
             <span class="from"></span>
             <span class="date"></span>
@@ -75,6 +85,7 @@
           <span class="snippet"></span>
         </button>
         <div class="actions"></div>
+        <div class="toolbar" hidden></div>
         <div class="thread-body" hidden>
           <p class="body-status">Loading…</p>
           <button class="show-images link" type="button" hidden>Show images</button>

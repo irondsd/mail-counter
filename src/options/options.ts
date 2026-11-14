@@ -2,13 +2,18 @@ import { playChime } from "../lib/chime.ts";
 import { GOOGLE_CLIENT_ID } from "../lib/config.ts";
 import { formatDate } from "../lib/preview.ts";
 import {
+  type EmptyClick,
   formatInterval,
   INTERVAL_CHOICES,
   intervalFor,
   normalizeSettings,
   type Settings,
+  type Theme,
 } from "../lib/settings.ts";
+import { applyTheme, initTheme } from "../lib/theme.ts";
 import type { AccountState, Message, Reply } from "../lib/types.ts";
+
+initTheme();
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -20,6 +25,8 @@ const accountTpl = $<HTMLTemplateElement>("account-tpl");
 const soundBox = $<HTMLInputElement>("sound");
 const volume = $<HTMLInputElement>("volume");
 const volumeRow = volume.parentElement!;
+const themeRadios = [...document.querySelectorAll<HTMLInputElement>('input[name="theme"]')];
+const emptyClick = [...document.querySelectorAll<HTMLInputElement>('input[name="empty-click"]')];
 
 let emails: string[] = [];
 let states: AccountState[] = [];
@@ -106,6 +113,42 @@ function renderAccounts(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Toolbar icon
+// ---------------------------------------------------------------------------
+
+function renderEmptyClick(): void {
+  for (const radio of emptyClick) radio.checked = radio.value === settings.emptyClick;
+}
+
+for (const radio of emptyClick) {
+  radio.addEventListener("change", () => {
+    if (!radio.checked) return;
+    void saveSettings((s) => {
+      s.emptyClick = radio.value as EmptyClick;
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Appearance
+// ---------------------------------------------------------------------------
+
+function renderTheme(): void {
+  for (const radio of themeRadios) radio.checked = radio.value === settings.theme;
+}
+
+for (const radio of themeRadios) {
+  radio.addEventListener("change", () => {
+    if (!radio.checked) return;
+    const theme = radio.value as Theme;
+    applyTheme(theme); // right away, without waiting for the sync round trip
+    void saveSettings((s) => {
+      s.theme = theme;
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Sound
 // ---------------------------------------------------------------------------
 
@@ -149,6 +192,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "sync" && changes.settings) {
     settings = normalizeSettings(changes.settings.newValue);
     renderSound();
+    renderEmptyClick();
+    renderTheme();
   }
   if (area === "local" && changes.accounts) {
     states = (changes.accounts.newValue as AccountState[] | undefined) ?? [];
@@ -165,3 +210,5 @@ settings = normalizeSettings(sync.settings);
 states = (local.accounts as AccountState[] | undefined) ?? [];
 renderAccounts();
 renderSound();
+renderEmptyClick();
+renderTheme();

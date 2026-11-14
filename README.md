@@ -12,15 +12,17 @@ click **Reconnect**.
 
 - **Badge:** total unread conversations in Inbox across accounts. Amber means an account needs
   attention; hover for details.
-- **Click with nothing unread:** opens Gmail (the first account).
+- **Click with nothing unread:** opens Gmail (the first account), or the popup if you choose that in Options.
 - **Click with unread mail:** opens the popup with a card for each unread conversation (sender,
   subject and the first lines of the email). Hover one for **Open**, **Mark as read**,
   **Archive** (also marks it read) and **Report spam**. Click a card to expand it and read the
   whole email in place; click again or press Esc to fold it. With exactly one unread email, it
   opens already expanded.
-- **Right-click the icon:** **Open** any account's inbox, or **Options**.
+- **Right-click the icon:** **Open** any account's inbox, **Refresh** to check every account now,
+  **Open popup**, or **Options**.
 - **Options page:** add, reconnect and remove accounts; how often to check each account (10 seconds
-  to 10 minutes); the new-mail chime and its volume.
+  to 10 minutes); what clicking the icon does when nothing is unread; light, dark or system theme;
+  the new-mail chime and its volume.
 - **New-mail chime:** a short sound when a check finds a new unread conversation or a new
   message in one. Connecting an account doesn't chime for mail already there.
 - **Email preview:** scripts, forms and remote images are blocked, so tracking pixels don't
@@ -48,7 +50,7 @@ bun run icons      # assets/icon.svg → public/icons/*.png
 | --------------------- | ----------------------------------------------------------------- |
 | `src/background.ts`   | service worker: OAuth, polling, badge, actions, click behavior    |
 | `src/popup/`          | popup UI                                                          |
-| `src/options/`        | options page: accounts, check intervals, sound                    |
+| `src/options/`        | options page: accounts, check intervals, icon click, sound        |
 | `src/offscreen/`      | hidden page that plays the chime (service workers can't)          |
 | `src/ui/base.css`     | colors and buttons shared by the popup and options page           |
 | `src/lib/`            | pure logic (OAuth URLs, Gmail API, badge), unit-tested in `test/` |

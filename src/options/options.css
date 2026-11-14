@@ -121,6 +121,58 @@ button.danger {
   accent-color: var(--accent);
 }
 
+.choices .check {
+  margin: 0;
+}
+
+.choices .check + .check {
+  margin-top: 8px;
+}
+
+/* Theme switcher: radios drawn as one row of buttons. */
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.segmented label {
+  position: relative;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented span {
+  display: block;
+  padding: 5px 14px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.segmented span:hover {
+  color: var(--fg);
+}
+
+.segmented input:checked + span {
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.segmented input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .volume {
   display: flex;
   align-items: center;

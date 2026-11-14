@@ -6,7 +6,19 @@ export interface Settings {
   volume: number;
   /** Seconds between checks, per account. Missing → DEFAULT_INTERVAL_SECONDS. */
   checkEvery: Record<string, number>;
+  /** What clicking the toolbar icon does when nothing is unread. */
+  emptyClick: EmptyClick;
+  /** Color theme of the popup and options page. */
+  theme: Theme;
 }
+
+/** "gmail" opens the inbox in a tab; "popup" shows the popup as usual. */
+export type EmptyClick = "gmail" | "popup";
+
+/** "system" follows the browser's light or dark setting. */
+export type Theme = "system" | "light" | "dark";
+
+export const THEMES: readonly Theme[] = ["system", "light", "dark"];
 
 export const MIN_INTERVAL_SECONDS = 10;
 export const MAX_INTERVAL_SECONDS = 10 * 60;
@@ -15,7 +27,13 @@ export const DEFAULT_INTERVAL_SECONDS = 60;
 /** Choices offered on the options page. */
 export const INTERVAL_CHOICES = [10, 15, 30, 60, 120, 300, 600] as const;
 
-export const DEFAULT_SETTINGS: Settings = { sound: true, volume: 0.6, checkEvery: {} };
+export const DEFAULT_SETTINGS: Settings = {
+  sound: true,
+  volume: 0.6,
+  checkEvery: {},
+  emptyClick: "gmail",
+  theme: "system",
+};
 
 const clampInterval = (seconds: number) =>
   Math.min(MAX_INTERVAL_SECONDS, Math.max(MIN_INTERVAL_SECONDS, Math.round(seconds)));
@@ -41,6 +59,8 @@ export function normalizeSettings(raw: unknown): Settings {
     sound: typeof r.sound === "boolean" ? r.sound : DEFAULT_SETTINGS.sound,
     volume: isNumber(r.volume) ? Math.min(1, Math.max(0, r.volume)) : DEFAULT_SETTINGS.volume,
     checkEvery,
+    emptyClick: r.emptyClick === "popup" ? "popup" : DEFAULT_SETTINGS.emptyClick,
+    theme: THEMES.includes(r.theme as Theme) ? (r.theme as Theme) : DEFAULT_SETTINGS.theme,
   };
 }
 

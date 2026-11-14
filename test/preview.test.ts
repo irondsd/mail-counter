@@ -4,6 +4,7 @@ import {
   escapeHtml,
   formatDate,
   hasRemoteImages,
+  initial,
 } from "../src/lib/preview.ts";
 
 describe("buildPreviewDocument", () => {
@@ -62,4 +63,11 @@ test("formatDate shows time today, day and month this year, full date before", (
   expect(formatDate(new Date(2026, 2, 3).getTime(), now)).toMatch(/3/);
   expect(formatDate(new Date(2024, 2, 3).getTime(), now)).toMatch(/2024/);
   expect(formatDate(0, now)).toBe("");
+});
+
+test("initial takes the first letter or digit", () => {
+  expect(initial("you@gmail.com")).toBe("Y");
+  expect(initial('"Élodie" Martin')).toBe("É");
+  expect(initial("42 Studio")).toBe("4");
+  expect(initial("—")).toBe("?");
 });
