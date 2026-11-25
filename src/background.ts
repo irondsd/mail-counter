@@ -37,6 +37,7 @@ import type {
   Message,
   OffscreenMessage,
   Reply,
+  ThreadAction,
   ThreadSummary,
   Token,
 } from "./lib/types.ts";
@@ -426,6 +427,16 @@ async function openTab(url: string): Promise<void> {
   await chrome.tabs.create({ url });
 }
 
+async function runThreadAction(
+  email: string,
+  threadId: string,
+  action: ThreadAction,
+): Promise<void> {
+  await withToken(email, (t) => modifyThread(t, threadId, action));
+  await setStates(removeThread(await getStates(), email, threadId));
+  void refreshAll();
+}
+
 async function handle(message: Message): Promise<unknown> {
   switch (message.type) {
     case "add-account":
@@ -440,13 +451,12 @@ async function handle(message: Message): Promise<unknown> {
       return openTab(gmailUrl(message.email));
     case "open-thread":
       return openTab(gmailUrl(message.email, message.threadId));
-    case "thread-action": {
-      const { email, threadId, action } = message;
-      await withToken(email, (t) => modifyThread(t, threadId, action));
-      await setStates(removeThread(await getStates(), email, threadId));
-      void refreshAll();
-      return;
-    }
+    case "open-preview-link":
+      // Opening the tab can close the popup before Gmail finishes updating the thread.
+      await openTab(message.url);
+      return runThreadAction(message.email, message.threadId, "read");
+    case "thread-action":
+      return runThreadAction(message.email, message.threadId, message.action);
     case "get-body":
       return withToken(message.email, (t) => fetchMessageBody(t, message.messageId));
   }

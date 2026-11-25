@@ -23,6 +23,7 @@ const noAccounts = $("no-accounts");
 const addButton = $<HTMLButtonElement>("add");
 const accountTpl = $<HTMLTemplateElement>("account-tpl");
 const soundBox = $<HTMLInputElement>("sound");
+const showImagesBox = $<HTMLInputElement>("show-images");
 const volume = $<HTMLInputElement>("volume");
 const volumeRow = volume.parentElement!;
 const themeRadios = [...document.querySelectorAll<HTMLInputElement>('input[name="theme"]')];
@@ -149,6 +150,20 @@ for (const radio of themeRadios) {
 }
 
 // ---------------------------------------------------------------------------
+// Email preview
+// ---------------------------------------------------------------------------
+
+function renderShowImages(): void {
+  showImagesBox.checked = settings.showImages;
+}
+
+showImagesBox.addEventListener("change", () => {
+  void saveSettings((s) => {
+    s.showImages = showImagesBox.checked;
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Sound
 // ---------------------------------------------------------------------------
 
@@ -194,6 +209,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     renderSound();
     renderEmptyClick();
     renderTheme();
+    renderShowImages();
   }
   if (area === "local" && changes.accounts) {
     states = (changes.accounts.newValue as AccountState[] | undefined) ?? [];
@@ -212,3 +228,4 @@ renderAccounts();
 renderSound();
 renderEmptyClick();
 renderTheme();
+renderShowImages();

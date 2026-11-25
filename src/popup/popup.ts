@@ -1,5 +1,6 @@
 import { formatCount } from "../lib/badge.ts";
 import { buildPreviewDocument, formatDate, hasRemoteImages, initial } from "../lib/preview.ts";
+import { normalizeSettings } from "../lib/settings.ts";
 import { removeThread } from "../lib/state.ts";
 import { initTheme } from "../lib/theme.ts";
 import type {
@@ -28,6 +29,9 @@ const threadTpl = $<HTMLTemplateElement>("thread-tpl");
 const FRAME_MIN = 120;
 
 let accounts: AccountState[] = [];
+
+/** "Always show remote images" from the options page. */
+let alwaysShowImages = false;
 
 /** The card showing its whole email. Its body is kept here so re-renders don't refetch it. */
 let expanded: {
@@ -147,7 +151,7 @@ function renderThread(email: string, thread: ThreadSummary): HTMLLIElement {
   });
 
   const frame = el<HTMLIFrameElement>(li, ".body-frame");
-  frame.addEventListener("load", () => fitFrame(frame));
+  frame.addEventListener("load", () => fitFrame(frame, email, thread.id));
 
   if (isExpanded(email, thread)) {
     li.classList.add("expanded");
@@ -235,7 +239,7 @@ function render(): void {
  * header; longer emails scroll inside it. The card scrolls to the top so the sender, subject
  * and buttons stay in view.
  */
-function fitFrame(frame: HTMLIFrameElement): void {
+function fitFrame(frame: HTMLIFrameElement, email: string, threadId: string): void {
   const doc = frame.contentDocument;
   if (!doc?.body || !frame.srcdoc) return;
   // Links in the email open in a fresh tab (no opener, no referrer).
@@ -243,7 +247,9 @@ function fitFrame(frame: HTMLIFrameElement): void {
     const link = (event.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
     if (!link) return;
     event.preventDefault();
-    if (/^(https?|mailto):/i.test(link.href)) void chrome.tabs.create({ url: link.href });
+    if (/^(https?|mailto):/i.test(link.href)) {
+      void send({ type: "open-preview-link", email, threadId, url: link.href });
+    }
   });
   requestAnimationFrame(() => {
     const card = frame.closest<HTMLElement>(".thread");
@@ -271,7 +277,7 @@ function toggle(email: string, thread: ThreadSummary): void {
     collapse();
     return;
   }
-  expanded = { email, threadId: thread.id, images: false };
+  expanded = { email, threadId: thread.id, images: alwaysShowImages };
   render();
   void loadBody(email, thread);
 }
@@ -360,8 +366,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (!stillThere) render();
 });
 
-const stored = await chrome.storage.local.get("accounts");
+const [stored, synced] = await Promise.all([
+  chrome.storage.local.get("accounts"),
+  chrome.storage.sync.get("settings"),
+]);
 accounts = (stored.accounts as AccountState[] | undefined) ?? [];
+alwaysShowImages = normalizeSettings(synced.settings).showImages;
 render();
 
 // One unread email: open it straight away.

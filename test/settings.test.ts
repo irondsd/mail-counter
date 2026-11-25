@@ -24,6 +24,7 @@ describe("normalizeSettings", () => {
       checkEvery: { "a@x.com": 30 },
       emptyClick: "gmail",
       theme: "system",
+      showImages: false,
     });
   });
 
@@ -38,6 +39,12 @@ describe("normalizeSettings", () => {
     expect(normalizeSettings({ theme: "light" }).theme).toBe("light");
     expect(normalizeSettings({ theme: "sepia" }).theme).toBe("system");
     expect(normalizeSettings({}).theme).toBe("system");
+  });
+
+  test("remote images stay blocked unless turned on", () => {
+    expect(normalizeSettings({ showImages: true }).showImages).toBe(true);
+    expect(normalizeSettings({ showImages: "yes" }).showImages).toBe(false);
+    expect(normalizeSettings({}).showImages).toBe(false);
   });
 
   test("intervals are kept between 10 seconds and 10 minutes", () => {

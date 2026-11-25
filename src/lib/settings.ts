@@ -10,6 +10,8 @@ export interface Settings {
   emptyClick: EmptyClick;
   /** Color theme of the popup and options page. */
   theme: Theme;
+  /** Load remote images in email previews without asking. Off by default: they're often tracking pixels. */
+  showImages: boolean;
 }
 
 /** "gmail" opens the inbox in a tab; "popup" shows the popup as usual. */
@@ -33,6 +35,7 @@ export const DEFAULT_SETTINGS: Settings = {
   checkEvery: {},
   emptyClick: "gmail",
   theme: "system",
+  showImages: false,
 };
 
 const clampInterval = (seconds: number) =>
@@ -61,6 +64,7 @@ export function normalizeSettings(raw: unknown): Settings {
     checkEvery,
     emptyClick: r.emptyClick === "popup" ? "popup" : DEFAULT_SETTINGS.emptyClick,
     theme: THEMES.includes(r.theme as Theme) ? (r.theme as Theme) : DEFAULT_SETTINGS.theme,
+    showImages: typeof r.showImages === "boolean" ? r.showImages : DEFAULT_SETTINGS.showImages,
   };
 }
 

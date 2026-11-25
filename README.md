@@ -26,7 +26,9 @@ click **Reconnect**.
 - **New-mail chime:** a short sound when a check finds a new unread conversation or a new
   message in one. Connecting an account doesn't chime for mail already there.
 - **Email preview:** scripts, forms and remote images are blocked, so tracking pixels don't
-  report that you opened it. **Show images** loads them. Links open in a new tab.
+  report that you opened it. **Show images** loads them, or turn on
+  **Always show remote images** in the options. Clicking a link, including a calendar RSVP
+  button, opens it in a new tab and marks the conversation as read.
 - **Polling:** each account on its own interval (default every minute), plus all of them whenever
   the popup opens. Chrome alarms can't fire more often than every 30 seconds, so shorter
   intervals run on a timer and a 30-second alarm restarts it if Chrome puts the extension to

@@ -47,6 +47,7 @@ export type Message =
   | { type: "refresh" }
   | { type: "open"; email: string }
   | { type: "open-thread"; email: string; threadId: string }
+  | { type: "open-preview-link"; email: string; threadId: string; url: string }
   | { type: "thread-action"; email: string; threadId: string; action: ThreadAction }
   | { type: "get-body"; email: string; messageId: string };
 
